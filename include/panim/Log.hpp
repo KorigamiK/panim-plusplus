@@ -31,11 +31,16 @@ namespace panim {
     }
 } // namespace panim
 
-#define PANIM_LOG_TRACE(fmt, ...) panim::log_fallback("TRACE", panim::panim_format(fmt, ##__VA_ARGS__))
-#define PANIM_LOG_DEBUG(fmt, ...) panim::log_fallback("DEBUG", panim::panim_format(fmt, ##__VA_ARGS__))
-#define PANIM_LOG_INFO(fmt, ...) panim::log_fallback("INFO", panim::panim_format(fmt, ##__VA_ARGS__))
-#define PANIM_LOG_WARN(fmt, ...) panim::log_fallback("WARN", panim::panim_format(fmt, ##__VA_ARGS__))
-#define PANIM_LOG_ERROR(fmt, ...) panim::log_fallback("ERROR", panim::panim_format(fmt, ##__VA_ARGS__))
+#define PANIM_LOG_TRACE(fmt, ...) \
+    panim::log_fallback("TRACE", panim::panim_format(fmt __VA_OPT__(, ) __VA_ARGS__))
+#define PANIM_LOG_DEBUG(fmt, ...) \
+    panim::log_fallback("DEBUG", panim::panim_format(fmt __VA_OPT__(, ) __VA_ARGS__))
+#define PANIM_LOG_INFO(fmt, ...) \
+    panim::log_fallback("INFO", panim::panim_format(fmt __VA_OPT__(, ) __VA_ARGS__))
+#define PANIM_LOG_WARN(fmt, ...) \
+    panim::log_fallback("WARN", panim::panim_format(fmt __VA_OPT__(, ) __VA_ARGS__))
+#define PANIM_LOG_ERROR(fmt, ...) \
+    panim::log_fallback("ERROR", panim::panim_format(fmt __VA_OPT__(, ) __VA_ARGS__))
 
 #endif
 

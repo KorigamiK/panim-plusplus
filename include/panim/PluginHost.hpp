@@ -26,6 +26,7 @@ namespace panim {
 
     private:
         void *handle_ = nullptr;
+        PluginApiVersionFn api_version_fn_ = nullptr;
         CreateAnimationFn create_fn_ = nullptr;
         DestroyAnimationFn destroy_fn_ = nullptr;
         std::filesystem::path path_;

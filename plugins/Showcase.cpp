@@ -1,26 +1,49 @@
+#include <algorithm>
 #include <cmath>
 #include <utility>
 
 #include "panim/Animation.hpp"
-#include "panim/CudaHelpers.hpp"
+#include "panim/Compute.hpp"
 #include "panim/EquationMorph.hpp"
 #include "panim/Frame.hpp"
 #include "panim/LatexRenderer.hpp"
 #include "panim/LatexTrack.hpp"
 #include "panim/Log.hpp"
 #include "panim/Painter.hpp"
+#include "panim/Plugin.hpp"
 #include "panim/Timeline.hpp"
 
+using panim::AnimationContext;
 using panim::Color;
 using panim::Frame;
-using panim::AnimationContext;
 using panim::Painter;
 namespace anim = panim::anim;
 
 namespace {
 
+    double smoothstep(double t) {
+        t = std::clamp(t, 0.0, 1.0);
+        return t * t * (3.0 - 2.0 * t);
+    }
+
+    double equation_phase(double t) {
+        if (t < 2.0)
+            return 0.0;
+        if (t < 2.75)
+            return smoothstep((t - 2.0) / 0.75);
+        if (t < 6.5)
+            return 1.0;
+        if (t < 7.25)
+            return 1.0 - smoothstep((t - 6.5) / 0.75);
+        return 0.0;
+    }
+
     class Showcase : public panim::Animation {
     public:
+        panim::AnimationInfo info() const override {
+            return {"Showcase", 10.0, 1280, 720, 30.0};
+        }
+
         void on_setup(const AnimationContext &ctx) override {
             ctx_ = ctx;
             loop_duration_ = 10.0;
@@ -74,7 +97,12 @@ namespace {
             // Optional LaTeX elements.
             latex_ready_ = ctx.latex != nullptr;
             if (latex_ready_) {
-                auto st = morph_.init("e^{i\\pi}+1=0", "\\nabla \\times (\\vec E)= -\\partial_t \\vec B", *ctx.latex, 1.0, static_cast<int>(ctx.height * 0.22));
+                auto st = morph_.init(
+                    "e^{i\\pi}+1=0",
+                    "e^{i\\pi}=-1",
+                    *ctx.latex,
+                    1.0,
+                    static_cast<int>(ctx.height * 0.12));
                 if (!st.ok) {
                     PANIM_LOG_WARN("Showcase: morph init failed: {}", st.message);
                     latex_ready_ = false;
@@ -83,11 +111,11 @@ namespace {
                 }
 
                 caption_.set_center_norm(0.5, 0.14);
-                caption_.set_target_height_ratio(0.10);
-                caption_.add_keyframe("\\text{Hardware accel when available}", 1.0, 0.6);
-                caption_.add_keyframe("\\text{Timeline-driven blobs}", 1.0, 0.6);
-                caption_.add_keyframe("\\text{LaTeX overlays (optional)}", 1.0, 0.6);
-                caption_.add_keyframe("\\text{Replace me with your scene}", 1.0, 0.6);
+                caption_.set_target_height_ratio(0.05);
+                caption_.add_keyframe("\\text{Hardware accel when available}", 1.4, 0.6);
+                caption_.add_keyframe("\\text{Timeline-driven blobs}", 1.4, 0.6);
+                caption_.add_keyframe("\\text{LaTeX overlays (optional)}", 1.4, 0.6);
+                caption_.add_keyframe("\\text{Replace me with your scene}", 1.4, 0.6);
                 auto st2 = caption_.prepare(*ctx.latex, ctx.height);
                 if (!st2.ok) {
                     PANIM_LOG_WARN("Showcase: caption prep failed: {}", st2.message);
@@ -114,8 +142,7 @@ namespace {
             draw_badge(frame, tt);
 
             if (latex_ready_ && morph_.ready()) {
-                double phase = 0.5 + 0.5 * std::sin(tt * 0.8);
-                morph_.render(frame, phase);
+                morph_.render(frame, equation_phase(tt));
             }
             if (latex_ready_ && caption_.ready()) {
                 double ct = std::fmod(tt, caption_.duration());
@@ -142,7 +169,7 @@ namespace {
         bool latex_ready_ = false;
 
         Frame badge_{0, 0};
-        bool cuda_logged_ = false;
+        bool compute_logged_ = false;
 
         void draw_grid(Frame &frame, double alpha) {
             if (alpha <= 0.0)
@@ -181,13 +208,17 @@ namespace {
         }
 
         void draw_badge(Frame &frame, double t) {
-            // Animate badge opacity and spin hue using CUDA invert on the small badge when available.
+            // Exercise the automatically selected compute path on a small overlay.
             float opacity = static_cast<float>(0.55 + 0.25 * std::sin(t * 1.3));
             Frame temp = badge_;
-            bool gpu_ok = gpu_invert(temp);
-            if (gpu_ok && !cuda_logged_) {
-                PANIM_LOG_INFO("Showcase: CUDA invert active on badge overlay");
-                cuda_logged_ = true;
+            panim::ComputeParams params;
+            auto result = panim::apply_compute_effect(
+                temp, panim::ComputeEffect::Invert, params);
+            if (result.ok && !compute_logged_) {
+                PANIM_LOG_INFO(
+                    "Showcase: {} invert active on badge overlay",
+                    panim::compute_backend_name(result.backend));
+                compute_logged_ = true;
             }
             Painter p(frame);
             int px = static_cast<int>(ctx_.width * 0.08);
@@ -198,5 +229,4 @@ namespace {
 
 } // namespace
 
-extern "C" panim::Animation *create_animation() { return new Showcase(); }
-extern "C" void destroy_animation(panim::Animation *a) { delete a; }
+PANIM_EXPORT_ANIMATION(Showcase)

@@ -19,7 +19,7 @@ namespace panim {
     } // namespace
 
     void Painter::clear(Color c) {
-        fill_rect(0, 0, frame_.width, frame_.height, c, 1.0f);
+        frame_.clear(c.r, c.g, c.b, c.a);
     }
 
     void Painter::fill_rect(int x, int y, int w, int h, Color c, float alpha) {
@@ -62,18 +62,20 @@ namespace panim {
     void Painter::fill_circle(int cx, int cy, int radius, Color c, float alpha) {
         if (radius <= 0 || alpha <= 0.0f)
             return;
-        int r2 = radius * radius;
-        int x0 = std::max(0, cx - radius);
-        int y0 = std::max(0, cy - radius);
-        int x1 = std::min(frame_.width - 1, cx + radius);
-        int y1 = std::min(frame_.height - 1, cy + radius);
+        int x0 = std::max(0, cx - radius - 1);
+        int y0 = std::max(0, cy - radius - 1);
+        int x1 = std::min(frame_.width - 1, cx + radius + 1);
+        int y1 = std::min(frame_.height - 1, cy + radius + 1);
         for (int y = y0; y <= y1; ++y) {
-            int dy = y - cy;
             for (int x = x0; x <= x1; ++x) {
-                int dx = x - cx;
-                if (dx * dx + dy * dy <= r2) {
+                double dx = static_cast<double>(x - cx);
+                double dy = static_cast<double>(y - cy);
+                double distance = std::sqrt(dx * dx + dy * dy);
+                float coverage = static_cast<float>(
+                    std::clamp(radius + 0.5 - distance, 0.0, 1.0));
+                if (coverage > 0.0f) {
                     uint8_t *p = frame_.pixel_ptr(x, y);
-                    blend_pixel(p, c, alpha);
+                    blend_pixel(p, c, alpha * coverage);
                 }
             }
         }
@@ -83,23 +85,38 @@ namespace panim {
         if (alpha <= 0.0f)
             return;
         thickness = std::max(1, thickness);
-        int dx = std::abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
-        int dy = -std::abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
-        int err = dx + dy;
 
-        while (true) {
-            int half = thickness / 2;
-            fill_rect(x0 - half, y0 - half, thickness, thickness, c, alpha);
-            if (x0 == x1 && y0 == y1)
-                break;
-            int e2 = 2 * err;
-            if (e2 >= dy) {
-                err += dy;
-                x0 += sx;
-            }
-            if (e2 <= dx) {
-                err += dx;
-                y0 += sy;
+        double ax = static_cast<double>(x0);
+        double ay = static_cast<double>(y0);
+        double bx = static_cast<double>(x1);
+        double by = static_cast<double>(y1);
+        double vx = bx - ax;
+        double vy = by - ay;
+        double length_sq = vx * vx + vy * vy;
+        double half_width = thickness * 0.5;
+        int padding = static_cast<int>(std::ceil(half_width + 1.0));
+        int min_x = std::max(0, std::min(x0, x1) - padding);
+        int min_y = std::max(0, std::min(y0, y1) - padding);
+        int max_x = std::min(frame_.width - 1, std::max(x0, x1) + padding);
+        int max_y = std::min(frame_.height - 1, std::max(y0, y1) + padding);
+
+        for (int y = min_y; y <= max_y; ++y) {
+            for (int x = min_x; x <= max_x; ++x) {
+                double projection = 0.0;
+                if (length_sq > 0.0) {
+                    projection = ((x - ax) * vx + (y - ay) * vy) / length_sq;
+                    projection = std::clamp(projection, 0.0, 1.0);
+                }
+                double closest_x = ax + projection * vx;
+                double closest_y = ay + projection * vy;
+                double dx = x - closest_x;
+                double dy = y - closest_y;
+                double distance = std::sqrt(dx * dx + dy * dy);
+                float coverage = static_cast<float>(
+                    std::clamp(half_width + 0.5 - distance, 0.0, 1.0));
+                if (coverage > 0.0f) {
+                    blend_pixel(frame_.pixel_ptr(x, y), c, alpha * coverage);
+                }
             }
         }
     }
@@ -123,5 +140,58 @@ namespace panim {
         }
     }
 
-} // namespace panim
+    void Painter::blit_scaled(const Frame &src,
+                              int dst_x,
+                              int dst_y,
+                              int dst_width,
+                              int dst_height,
+                              float opacity) {
+        if (src.width <= 0 || src.height <= 0 ||
+            dst_width <= 0 || dst_height <= 0 || opacity <= 0.0f) {
+            return;
+        }
 
+        int x_begin = std::max(0, dst_x);
+        int y_begin = std::max(0, dst_y);
+        int x_end = std::min(frame_.width, dst_x + dst_width);
+        int y_end = std::min(frame_.height, dst_y + dst_height);
+        for (int y = y_begin; y < y_end; ++y) {
+            double source_y = ((y - dst_y) + 0.5) * src.height /
+                                  static_cast<double>(dst_height) -
+                              0.5;
+            int y0 = std::clamp(static_cast<int>(std::floor(source_y)),
+                                0,
+                                src.height - 1);
+            int y1 = std::min(y0 + 1, src.height - 1);
+            double fy = std::clamp(source_y - std::floor(source_y), 0.0, 1.0);
+
+            for (int x = x_begin; x < x_end; ++x) {
+                double source_x = ((x - dst_x) + 0.5) * src.width /
+                                      static_cast<double>(dst_width) -
+                                  0.5;
+                int x0 = std::clamp(static_cast<int>(std::floor(source_x)),
+                                    0,
+                                    src.width - 1);
+                int x1 = std::min(x0 + 1, src.width - 1);
+                double fx = std::clamp(source_x - std::floor(source_x), 0.0, 1.0);
+
+                const uint8_t *p00 = src.pixel_ptr(x0, y0);
+                const uint8_t *p10 = src.pixel_ptr(x1, y0);
+                const uint8_t *p01 = src.pixel_ptr(x0, y1);
+                const uint8_t *p11 = src.pixel_ptr(x1, y1);
+                Color sample;
+                uint8_t *channels[] = {&sample.r, &sample.g, &sample.b, &sample.a};
+                for (int channel = 0; channel < 4; ++channel) {
+                    double top = p00[channel] +
+                                 (p10[channel] - p00[channel]) * fx;
+                    double bottom = p01[channel] +
+                                    (p11[channel] - p01[channel]) * fx;
+                    *channels[channel] = static_cast<uint8_t>(std::lround(
+                        top + (bottom - top) * fy));
+                }
+                blend_pixel(frame_.pixel_ptr(x, y), sample, opacity);
+            }
+        }
+    }
+
+} // namespace panim

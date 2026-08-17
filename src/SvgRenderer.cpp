@@ -3,7 +3,9 @@
 
 #ifdef PANIM_ENABLE_SVG
 
+#include <algorithm>
 #include <cairo/cairo.h>
+#include <cmath>
 #include <librsvg/rsvg.h>
 #include <vector>
 
@@ -16,11 +18,32 @@ namespace panim {
             double width = 0.0;
             double height = 0.0;
 
+            SvgImage() = default;
+            SvgImage(const SvgImage &) = delete;
+            SvgImage &operator=(const SvgImage &) = delete;
+
+            SvgImage(SvgImage &&other) noexcept
+                : handle(other.handle), width(other.width), height(other.height) {
+                other.handle = nullptr;
+            }
+
             ~SvgImage() {
                 if (handle)
                     g_object_unref(handle);
             }
         };
+
+        bool load_dimensions(SvgImage &img, const std::string &label) {
+            gdouble w = 0.0;
+            gdouble h = 0.0;
+            if (!rsvg_handle_get_intrinsic_size_in_pixels(img.handle, &w, &h)) {
+                PANIM_LOG_ERROR("SVG has no intrinsic size: {}", label);
+                return false;
+            }
+            img.width = w;
+            img.height = h;
+            return true;
+        }
 
         SvgImage load_svg(const std::filesystem::path &path) {
             GError *err = nullptr;
@@ -34,18 +57,36 @@ namespace panim {
                 return img;
             }
 
-            gdouble w = 0, h = 0;
-            if (!rsvg_handle_get_intrinsic_size_in_pixels(img.handle, &w, &h)) {
-                PANIM_LOG_ERROR("SVG has no intrinsic size: {}", path.string());
+            if (!load_dimensions(img, path.string())) {
+                g_object_unref(img.handle);
+                img.handle = nullptr;
+            }
+            return img;
+        }
+
+        SvgImage load_svg_data(std::string_view data) {
+            GError *err = nullptr;
+            SvgImage img;
+            img.handle = rsvg_handle_new_from_data(
+                reinterpret_cast<const guint8 *>(data.data()), data.size(), &err);
+            if (!img.handle) {
+                std::string msg = err ? err->message : "unknown error";
+                if (err)
+                    g_error_free(err);
+                PANIM_LOG_ERROR("Failed to load in-memory SVG: {}", msg);
                 return img;
             }
-            img.width = w;
-            img.height = h;
+
+            if (!load_dimensions(img, "in-memory SVG")) {
+                g_object_unref(img.handle);
+                img.handle = nullptr;
+            }
             return img;
         }
 
         void alpha_blend(Frame &dst, int dst_x, int dst_y,
-                         const std::vector<uint8_t> &src, int src_w, int src_h) {
+                         const std::vector<uint8_t> &src, int src_w, int src_h,
+                         int src_stride) {
             for (int y = 0; y < src_h; ++y) {
                 int fy = dst_y + y;
                 if (fy < 0 || fy >= dst.height)
@@ -54,7 +95,7 @@ namespace panim {
                     int fx = dst_x + x;
                     if (fx < 0 || fx >= dst.width)
                         continue;
-                    size_t si = static_cast<size_t>((y * src_w + x) * 4);
+                    size_t si = static_cast<size_t>(y * src_stride + x * 4);
                     uint8_t sr = src[si + 0];
                     uint8_t sg = src[si + 1];
                     uint8_t sb = src[si + 2];
@@ -76,44 +117,83 @@ namespace panim {
             }
         }
 
-        // Remove likely light background using corner sampling; skip if background is dark/transparent.
-        void remove_uniform_bg(std::vector<uint8_t> &raw, int w, int h) {
-            if (raw.empty())
-                return;
-            auto sample = [&](int x, int y) {
-                size_t idx = static_cast<size_t>((y * w + x) * 4);
-                return std::array<uint8_t, 4>{raw[idx], raw[idx + 1], raw[idx + 2], raw[idx + 3]};
-            };
-            std::array<uint8_t, 4> corners[] = {
-                sample(0, 0), sample(w - 1, 0), sample(0, h - 1), sample(w - 1, h - 1)};
-            int br = 0, bg = 0, bb = 0, ba = 0;
-            for (auto &c : corners) {
-                br += c[0];
-                bg += c[1];
-                bb += c[2];
-                ba += c[3];
+        bool render_image_to_frame(SvgImage &img,
+                                   Frame &frame,
+                                   int dst_x,
+                                   int dst_y,
+                                   double scale) {
+            int out_w = static_cast<int>(std::lround(img.width * scale));
+            int out_h = static_cast<int>(std::lround(img.height * scale));
+            if (out_w <= 0 || out_h <= 0)
+                return false;
+
+            int stride = cairo_format_stride_for_width(CAIRO_FORMAT_ARGB32, out_w);
+            std::vector<uint8_t> raw(static_cast<size_t>(stride * out_h), 0);
+
+            cairo_surface_t *surface = cairo_image_surface_create_for_data(
+                raw.data(), CAIRO_FORMAT_ARGB32, out_w, out_h, stride);
+            cairo_t *cr = cairo_create(surface);
+            cairo_set_antialias(cr, CAIRO_ANTIALIAS_BEST);
+
+            // librsvg scales the document into the supplied viewport. Using the
+            // intrinsic size here only painted an unscaled equation into the
+            // top-left corner of a larger transparent surface.
+            RsvgRectangle viewport{0, 0, static_cast<double>(out_w),
+                                   static_cast<double>(out_h)};
+            GError *err = nullptr;
+            if (!rsvg_handle_render_document(img.handle, cr, &viewport, &err)) {
+                if (err) {
+                    PANIM_LOG_ERROR("rsvg render failed: {}", err->message);
+                } else {
+                    PANIM_LOG_ERROR("rsvg render failed: unknown error");
+                }
+                cairo_destroy(cr);
+                cairo_surface_destroy(surface);
+                if (err)
+                    g_error_free(err);
+                return false;
             }
-            br /= 4;
-            bg /= 4;
-            bb /= 4;
-            ba /= 4;
-            int brightness = (br + bg + bb) / 3;
-            if (brightness < 220 || ba < 200) {
-                // background already dark/transparent; don't strip to avoid nuking strokes
-                return;
-            }
-            const int tol = 20;
-            for (size_t i = 0; i + 3 < raw.size(); i += 4) {
-                uint8_t r = raw[i], g = raw[i + 1], b = raw[i + 2], a = raw[i + 3];
-                int lum = (r + g + b) / 3;
-                if (a > 200 &&
-                    std::abs(int(r) - br) <= tol &&
-                    std::abs(int(g) - bg) <= tol &&
-                    std::abs(int(b) - bb) <= tol &&
-                    lum > 220) {
-                    raw[i + 3] = 0;
+
+            cairo_surface_flush(surface);
+            cairo_destroy(cr);
+            cairo_surface_destroy(surface);
+
+            // CAIRO ARGB32 is premultiplied BGRA on little-endian systems.
+            for (int y = 0; y < out_h; ++y) {
+                for (int x = 0; x < out_w; ++x) {
+                    size_t idx = static_cast<size_t>(y * stride + x * 4);
+                    uint8_t b = raw[idx + 0];
+                    uint8_t g = raw[idx + 1];
+                    uint8_t r = raw[idx + 2];
+                    uint8_t a = raw[idx + 3];
+                    if (a > 0) {
+                        float inv = 255.0f / a;
+                        r = static_cast<uint8_t>(std::min(255.0f, r * inv));
+                        g = static_cast<uint8_t>(std::min(255.0f, g * inv));
+                        b = static_cast<uint8_t>(std::min(255.0f, b * inv));
+                    }
+                    raw[idx + 0] = r;
+                    raw[idx + 1] = g;
+                    raw[idx + 2] = b;
+                    raw[idx + 3] = a;
                 }
             }
+
+            alpha_blend(frame, dst_x, dst_y, raw, out_w, out_h, stride);
+            return true;
+        }
+
+        bool rasterize_image(SvgImage &img, Frame &out, double scale) {
+            int width = static_cast<int>(std::lround(img.width * scale));
+            int height = static_cast<int>(std::lround(img.height * scale));
+            if (width <= 0 || height <= 0)
+                return false;
+
+            Frame frame(width, height);
+            if (!render_image_to_frame(img, frame, 0, 0, scale))
+                return false;
+            out = std::move(frame);
+            return true;
         }
 
     } // namespace
@@ -128,65 +208,7 @@ namespace panim {
         SvgImage img = load_svg(svg_path);
         if (!img.handle)
             return false;
-
-        int out_w = static_cast<int>(img.width * scale);
-        int out_h = static_cast<int>(img.height * scale);
-        if (out_w <= 0 || out_h <= 0)
-            return false;
-
-        int stride = cairo_format_stride_for_width(CAIRO_FORMAT_ARGB32, out_w);
-        std::vector<uint8_t> raw(static_cast<size_t>(stride * out_h), 0);
-
-        cairo_surface_t *surface = cairo_image_surface_create_for_data(
-            raw.data(), CAIRO_FORMAT_ARGB32, out_w, out_h, stride);
-        cairo_t *cr = cairo_create(surface);
-
-        // Surface is already scaled to desired output; no extra scale here.
-        RsvgRectangle viewport{0, 0, img.width, img.height};
-        GError *err = nullptr;
-        if (!rsvg_handle_render_document(img.handle, cr, &viewport, &err)) {
-            if (err) {
-                PANIM_LOG_ERROR("rsvg render failed: {}", err->message);
-            } else {
-                PANIM_LOG_ERROR("rsvg render failed: unknown error");
-            }
-            cairo_destroy(cr);
-            cairo_surface_destroy(surface);
-            if (err)
-                g_error_free(err);
-            return false;
-        }
-
-        cairo_destroy(cr);
-        cairo_surface_destroy(surface);
-
-        // Convert from CAIRO ARGB32 (premultiplied, stored BGRA on little-endian) to straight RGBA.
-        for (int y = 0; y < out_h; ++y) {
-            for (int x = 0; x < out_w; ++x) {
-                size_t idx = static_cast<size_t>(y * stride + x * 4);
-                uint8_t b = raw[idx + 0];
-                uint8_t g = raw[idx + 1];
-                uint8_t r = raw[idx + 2];
-                uint8_t a = raw[idx + 3];
-                if (a > 0) {
-                    float inv = 255.0f / a;
-                    r = static_cast<uint8_t>(std::min(255.0f, r * inv));
-                    g = static_cast<uint8_t>(std::min(255.0f, g * inv));
-                    b = static_cast<uint8_t>(std::min(255.0f, b * inv));
-                }
-                raw[idx + 0] = r;
-                raw[idx + 1] = g;
-                raw[idx + 2] = b;
-                raw[idx + 3] = a;
-            }
-        }
-
-        // If MicroTeX already renders with transparent background, no scrub is needed.
-        // Background scrub can be re-enabled if assets carry opaque backdrops.
-        // remove_uniform_bg(raw, out_w, out_h);
-
-        alpha_blend(frame, dst_x, dst_y, raw, out_w, out_h);
-        return true;
+        return render_image_to_frame(img, frame, dst_x, dst_y, scale);
     }
 
     bool svg_dimensions(const std::filesystem::path &svg_path, int &w, int &h) {
@@ -199,18 +221,19 @@ namespace panim {
     }
 
     bool rasterize_svg(const std::filesystem::path &svg_path, Frame &out, double scale) {
-        int w = 0, h = 0;
-        if (!svg_dimensions(svg_path, w, h))
+        if (!std::filesystem::exists(svg_path))
             return false;
-        w = static_cast<int>(w * scale);
-        h = static_cast<int>(h * scale);
-        if (w <= 0 || h <= 0)
+        SvgImage img = load_svg(svg_path);
+        if (!img.handle)
             return false;
-        Frame tmp(w, h);
-        if (!render_svg_to_frame(svg_path, tmp, 0, 0, scale))
+        return rasterize_image(img, out, scale);
+    }
+
+    bool rasterize_svg_data(std::string_view svg_data, Frame &out, double scale) {
+        SvgImage img = load_svg_data(svg_data);
+        if (!img.handle)
             return false;
-        out = std::move(tmp);
-        return true;
+        return rasterize_image(img, out, scale);
     }
 
 } // namespace panim

@@ -1,19 +1,43 @@
+#include <algorithm>
 #include <cmath>
 
 #include "panim/Animation.hpp"
-#include "panim/CudaHelpers.hpp"
+#include "panim/Compute.hpp"
 #include "panim/EquationMorph.hpp"
 #include "panim/Frame.hpp"
 #include "panim/LatexRenderer.hpp"
 #include "panim/Log.hpp"
+#include "panim/Plugin.hpp"
 #include "panim/SvgRenderer.hpp"
 
 using namespace panim;
 
 namespace {
 
+    double smoothstep(double t) {
+        t = std::clamp(t, 0.0, 1.0);
+        return t * t * (3.0 - 2.0 * t);
+    }
+
+    double equation_phase(double t) {
+        double cycle = std::fmod(t, 6.0);
+        if (cycle < 1.5)
+            return 0.0;
+        if (cycle < 2.25)
+            return smoothstep((cycle - 1.5) / 0.75);
+        if (cycle < 4.5)
+            return 1.0;
+        if (cycle < 5.25)
+            return 1.0 - smoothstep((cycle - 4.5) / 0.75);
+        return 0.0;
+    }
+
     class SampleWave : public Animation {
     public:
+        AnimationInfo info() const override {
+            return {"SampleWave", 6.0, 1280, 720, 30.0};
+        }
+
         void on_setup(const AnimationContext &ctx) override {
             ctx_ = ctx;
             if (ctx.latex) {
@@ -21,7 +45,7 @@ namespace {
                             "\\frac{1}{\\sqrt{\\pi}} e^{-x^2} \\longrightarrow 1",
                             *ctx.latex,
                             1.0,
-                            static_cast<int>(ctx.height * 0.28));
+                            static_cast<int>(ctx.height * 0.15));
                 morph_.set_center_norm(0.5, 0.6); // near center
             }
         }
@@ -50,33 +74,29 @@ namespace {
             }
 
             if (morph_.ready()) {
-                double phase = 0.5 + 0.5 * std::sin(t * 1.6);
-                morph_.render(frame, phase);
+                morph_.render(frame, equation_phase(t));
             }
 
-            static bool gpu_reported = false;
-            bool gpu_ok = gpu_invert(frame);
-            if (!gpu_reported) {
-                if (gpu_ok) {
-                    PANIM_LOG_INFO("GPU invert applied");
+            ComputeParams params;
+            auto result = apply_compute_effect(frame, ComputeEffect::Invert, params);
+            if (!compute_reported_) {
+                if (result.ok) {
+                    PANIM_LOG_INFO("{} invert applied",
+                                   compute_backend_name(result.backend));
                 } else {
-                    PANIM_LOG_WARN("CUDA not enabled; frame stays CPU-rendered");
+                    PANIM_LOG_WARN("Compute invert unavailable: {}",
+                                   result.message);
                 }
-                gpu_reported = true;
+                compute_reported_ = true;
             }
         }
 
     private:
         AnimationContext ctx_;
         EquationMorph morph_;
+        bool compute_reported_ = false;
     };
 
 } // namespace
 
-extern "C" Animation *create_animation() {
-    return new SampleWave();
-}
-
-extern "C" void destroy_animation(Animation *anim) {
-    delete anim;
-}
+PANIM_EXPORT_ANIMATION(SampleWave)

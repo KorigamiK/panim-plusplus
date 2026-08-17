@@ -13,6 +13,7 @@ namespace panim {
     Status LatexTrack::prepare(LatexRenderer &renderer, int frame_height) {
         ready_ = false;
         frames_.clear();
+        morphs_.clear();
         segments_.clear();
         total_duration_ = 0.0;
         if (keys_.empty())
@@ -41,6 +42,24 @@ namespace panim {
                 PANIM_LOG_ERROR("LatexTrack: empty alpha after rasterize for {} ({}x{})", k.latex, f.width, f.height);
             }
             frames_.push_back(std::move(f));
+        }
+
+        for (size_t i = 1; i < keys_.size(); ++i) {
+            EquationMorph morph;
+            auto status = morph.init(keys_[i - 1].latex,
+                                     keys_[i].latex,
+                                     renderer,
+                                     1.0,
+                                     target_h > 0 ? target_h : -1);
+            if (!status.ok) {
+                PANIM_LOG_WARN("LatexTrack: glyph morph unavailable for transition {}: {}",
+                               i - 1,
+                               status.message);
+            }
+            morph.set_center_norm(center_norm_x_, center_norm_y_);
+            if (tint_set_)
+                morph.set_tint(tint_r_, tint_g_, tint_b_);
+            morphs_.push_back(std::move(morph));
         }
 
         // Build segments: initial hold of key0
@@ -91,18 +110,48 @@ namespace panim {
 
     static Frame blend_frames(const Frame &a, const Frame &b, double t) {
         double u = std::clamp(t, 0.0, 1.0);
-        Frame out(a.width, a.height);
-        for (int y = 0; y < a.height; ++y) {
-            for (int x = 0; x < a.width; ++x) {
-                size_t idx = static_cast<size_t>((y * a.width + x) * 4);
-                const uint8_t *pa = a.pixels.data() + idx;
-                const uint8_t *pb = b.pixels.data() + idx;
-                double aa = pa[3] / 255.0;
-                double ab = pb[3] / 255.0;
-                double am = (1.0 - u) * aa + u * ab;
-                double r = (1.0 - u) * pa[0] * aa + u * pb[0] * ab;
-                double g = (1.0 - u) * pa[1] * aa + u * pb[1] * ab;
-                double bl = (1.0 - u) * pa[2] * aa + u * pb[2] * ab;
+        auto smoothstep = [](double value) {
+            double eased = std::clamp(value, 0.0, 1.0);
+            return eased * eased * (3.0 - 2.0 * eased);
+        };
+        double weight_a = 1.0 - smoothstep(u * 2.0);
+        double weight_b = smoothstep((u - 0.5) * 2.0);
+        int output_width = std::max(a.width, b.width);
+        int output_height = std::max(a.height, b.height);
+        int offset_a_x = (output_width - a.width) / 2;
+        int offset_a_y = (output_height - a.height) / 2;
+        int offset_b_x = (output_width - b.width) / 2;
+        int offset_b_y = (output_height - b.height) / 2;
+
+        Frame out(output_width, output_height);
+        for (int y = 0; y < output_height; ++y) {
+            for (int x = 0; x < output_width; ++x) {
+                int ax = x - offset_a_x;
+                int ay = y - offset_a_y;
+                int bx = x - offset_b_x;
+                int by = y - offset_b_y;
+
+                const uint8_t *pa = nullptr;
+                const uint8_t *pb = nullptr;
+                if (ax >= 0 && ax < a.width && ay >= 0 && ay < a.height) {
+                    pa = a.pixels.data() +
+                         static_cast<size_t>((ay * a.width + ax) * 4);
+                }
+                if (bx >= 0 && bx < b.width && by >= 0 && by < b.height) {
+                    pb = b.pixels.data() +
+                         static_cast<size_t>((by * b.width + bx) * 4);
+                }
+
+                double aa = pa ? pa[3] / 255.0 : 0.0;
+                double ab = pb ? pb[3] / 255.0 : 0.0;
+                double am = weight_a * aa + weight_b * ab;
+                double r = weight_a * (pa ? pa[0] : 0) * aa +
+                           weight_b * (pb ? pb[0] : 0) * ab;
+                double g = weight_a * (pa ? pa[1] : 0) * aa +
+                           weight_b * (pb ? pb[1] : 0) * ab;
+                double bl = weight_a * (pa ? pa[2] : 0) * aa +
+                            weight_b * (pb ? pb[2] : 0) * ab;
+                size_t idx = static_cast<size_t>((y * output_width + x) * 4);
                 uint8_t *po = out.pixels.data() + idx;
                 if (am > 1e-4) {
                     po[0] = static_cast<uint8_t>(r / am);
@@ -136,11 +185,31 @@ namespace panim {
             seg = &segments_.back();
 
         if (!seg->is_transition) {
-            alpha_over_center(frames_[seg->from_idx], target, center_norm_x_, center_norm_y_, tint_set_, tint_r_, tint_g_, tint_b_);
+            alpha_over_center(frames_[seg->from_idx],
+                              target,
+                              center_norm_x_,
+                              center_norm_y_,
+                              tint_set_,
+                              tint_r_,
+                              tint_g_,
+                              tint_b_);
         } else {
             double local_t = (tt - seg->start) / (seg->end - seg->start);
-            Frame blended = blend_frames(frames_[seg->from_idx], frames_[seg->to_idx], local_t);
-            alpha_over_center(blended, target, center_norm_x_, center_norm_y_, tint_set_, tint_r_, tint_g_, tint_b_);
+            size_t morph_index = static_cast<size_t>(seg->to_idx - 1);
+            if (morph_index < morphs_.size() && morphs_[morph_index].ready()) {
+                morphs_[morph_index].render(target, local_t);
+                return;
+            }
+            Frame blended = blend_frames(
+                frames_[seg->from_idx], frames_[seg->to_idx], local_t);
+            alpha_over_center(blended,
+                              target,
+                              center_norm_x_,
+                              center_norm_y_,
+                              tint_set_,
+                              tint_r_,
+                              tint_g_,
+                              tint_b_);
         }
     }
 

@@ -7,17 +7,29 @@ This repository hosts **panim++**, a programmatic animation engine written in C+
 ### Build System
 The project uses **CMake** (3.18+) and C++20.
 - **Build Type**: Defaults to `Release`.
-- **HW Acceleration**: Enabled by default (`-march=native`).
+- **CPU Acceleration**: Enabled by default (`-march=native`).
 - **FFmpeg**: Required for video output via `pkg-config`.
-- **CUDA**: Optional (`-DPANIM_ENABLE_CUDA=ON`).
+- **GPU Compute**: One WGSL implementation runs through wgpu-native. Set
+  `PANIM_WGPU_ROOT` when it is not installed in a default prefix. Adapter and
+  native-API selection are automatic; environment overrides are diagnostic.
 - **Exceptions**: Disabled globally (`-fno-exceptions`).
 
 ### Prerequisites (Debian/Ubuntu)
 ```bash
 sudo apt-get install cmake build-essential pkg-config \
     libavformat-dev libavcodec-dev libavutil-dev libswscale-dev \
-    libcairo2-dev librsvg2-dev
+    libcairo2-dev librsvg2-dev libtinyxml2-dev
 ```
+
+### Prerequisites (macOS)
+
+Use Homebrew packages and keep MicroTeX outside the repository:
+
+```bash
+./scripts/setup-macos.sh
+```
+
+For a manual system-dependency install, run `brew bundle --file Brewfile`.
 
 ### Compilation Commands
 ```bash
@@ -30,10 +42,19 @@ cmake --build build --parallel
 # Build a specific target
 cmake --build build --target panim
 cmake --build build --target SampleWave
+cmake --build build --target hardware_demo
+cmake --build build --target FeatureTour
 ```
 
 ### Running & Testing
-There is no dedicated unit test suite (e.g., GTest). Verification is done by running the `panim` executable with a plugin and checking the output.
+The project has lightweight core tests without an external test framework:
+
+```bash
+ctest --test-dir build --output-on-failure
+```
+
+Visual verification is done by running `panim` with a plugin and checking the
+output.
 
 **Run the default sample:**
 ```bash
@@ -42,12 +63,18 @@ There is no dedicated unit test suite (e.g., GTest). Verification is done by run
 
 **Run a specific plugin:**
 ```bash
-# Syntax: panim <plugin_path> <duration> <width> <height> <fps> <output_file>
-./build/bin/panim build/plugins/libShowcase.so 5.0 1920 1080 60 output.mp4
+# Plugin names are portable across `.dylib`, `.so`, and `.dll` hosts.
+./build/bin/panim Showcase --duration 5 --size 1920x1080 --fps 60 \
+    --output output.mp4
 ```
 
+On macOS, use `build/plugins/libShowcase.dylib`; the no-argument invocation
+discovers the correct platform suffix automatically.
+
 **Verification Step:**
-After modifying core code or plugins, always run the `SampleWave` or `Showcase` plugin to ensure the video renders without crashing and no errors appear in the logs.
+After modifying core code or plugins, always run the `SampleWave` or `Showcase`
+plugin to ensure the video renders without crashing and no errors appear in the
+logs. Run `HardwareDemo` after compute-backend changes.
 
 ## 2. Code Style & Conventions
 
@@ -92,23 +119,18 @@ After modifying core code or plugins, always run the `SampleWave` or `Showcase` 
 2. Register the new source file in `CMakeLists.txt` under `add_library(panim_core ...)`.
 
 ### Modifying Plugins
-- Plugins must export `create_animation` and `destroy_animation` C-compatible symbols.
+- Plugins must export the API version, `create_animation`, and
+  `destroy_animation` C-compatible symbols. Use
+  `PANIM_EXPORT_ANIMATION(Type)` to emit all three.
 - Plugins derive from `panim::Animation`.
 
 ### Creating a New Plugin
 To create a new animation plugin `MyAnim`:
-1. Create `plugins/MyAnim.cpp`.
-2. Add a build target in `CMakeLists.txt`:
+1. Create `plugins/MyAnim.cpp` and include `panim/Plugin.hpp`.
+2. Export the plugin with `PANIM_EXPORT_ANIMATION(MyAnim)`.
+3. Add a build target in `CMakeLists.txt`:
    ```cmake
-   add_library(my_anim SHARED plugins/MyAnim.cpp)
-   target_link_libraries(my_anim PRIVATE panim_core)
-   if(NOT MSVC)
-       target_compile_options(my_anim PRIVATE -fno-exceptions)
-   endif()
-   set_target_properties(my_anim PROPERTIES
-       OUTPUT_NAME MyAnim
-       LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/plugins
-   )
+   panim_add_plugin(my_anim plugins/MyAnim.cpp MyAnim)
    ```
 
 ### Logging
@@ -139,4 +161,5 @@ Since exceptions are disabled:
 1. **Header Inclusion**: When adding new core headers, ensure they are added to `include/panim/` and included as `#include "panim/Header.hpp"`.
 2. **Linker Errors**: If adding a new dependency, ensure it is linked in `CMakeLists.txt` using `target_link_libraries`.
 3. **Runtime Errors**: If the engine crashes, check if the plugin path is correct. The `panim` CLI attempts to guess, but explicit paths are safer.
-4. **Export Symbols**: Forgeting `extern "C"` on `create_animation` will cause dlsym lookup failures.
+4. **Export Symbols**: Prefer `PANIM_EXPORT_ANIMATION(Type)` so both required
+   C-compatible symbols and export visibility stay consistent.

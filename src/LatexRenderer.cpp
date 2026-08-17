@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <unistd.h>
 
@@ -34,6 +35,19 @@ namespace panim {
                 start = end + 1;
             }
             return "";
+        }
+
+        std::string shell_quote(std::string_view value) {
+            std::string quoted("'");
+            for (const char ch : value) {
+                if (ch == '\'') {
+                    quoted += "'\\''";
+                } else {
+                    quoted += ch;
+                }
+            }
+            quoted += '\'';
+            return quoted;
         }
 
     } // namespace
@@ -75,7 +89,15 @@ namespace panim {
             return Status::success();
         }
 
-        std::string command = microtex_bin_ + " -headless -foreground=#000000ff -background=#00000000 \"-input=" + latex + "\" -output=" + out_path.string() + " >/dev/null 2>&1";
+        const std::string command =
+            shell_quote(microtex_bin_) +
+            " -headless" +
+            " " + shell_quote("-foreground=#ffffffff") +
+            " " + shell_quote("-background=#00000000") +
+            " " + shell_quote("-padding=4") +
+            " " + shell_quote("-input=" + latex) +
+            " " + shell_quote("-output=" + out_path.string()) +
+            " >/dev/null 2>&1";
         int result = std::system(command.c_str());
         if (result != 0) {
             PANIM_LOG_ERROR("MicroTeX failed (code {}): {}", result, command);
@@ -101,19 +123,14 @@ namespace panim {
             }
         }
 
-        std::string from_path = find_in_path("LaTeX");
+        std::string from_path = find_in_path("microtex");
         if (!from_path.empty()) {
             out_path = from_path;
             return Status::success();
         }
 
-        std::filesystem::path fallback = "/home/origami/Dev/projects/cpp/MicroTeX-master/build/LaTeX";
-        if (::access(fallback.c_str(), X_OK) == 0) {
-            out_path = fallback.string();
-            return Status::success();
-        }
-
-        return Status::failure("MicroTeX binary not found. Set MICROTEX_BIN or install MicroTeX.");
+        return Status::failure(
+            "MicroTeX binary not found. Install 'microtex' on PATH or set MICROTEX_BIN.");
     }
 
 } // namespace panim

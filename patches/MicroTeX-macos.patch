@@ -1,0 +1,46 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 7879205..d9af4cb 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -53,7 +53,7 @@ if (MSVC)
+ else ()
+     find_package(PkgConfig REQUIRED)
+     pkg_check_modules(tinyxml2 REQUIRED IMPORTED_TARGET tinyxml2)
+-    target_link_libraries(LaTeX PRIVATE tinyxml2)
++    target_link_libraries(LaTeX PRIVATE PkgConfig::tinyxml2)
+ endif ()
+ 
+ # source files
+diff --git a/src/platform/cairo/graphic_cairo.cpp b/src/platform/cairo/graphic_cairo.cpp
+index 16331bf..e549b2a 100644
+--- a/src/platform/cairo/graphic_cairo.cpp
++++ b/src/platform/cairo/graphic_cairo.cpp
+@@ -4,6 +4,7 @@
+ 
+ #include "platform/cairo/graphic_cairo.h"
+ 
++#include <fontconfig/fcfreetype.h>
+ #include <fontconfig/fontconfig.h>
+ 
+ #include <utility>
+diff --git a/src/latex.cpp b/src/latex.cpp
+index e780078..9bec11a 100644
+--- a/src/latex.cpp
++++ b/src/latex.cpp
+@@ -3,6 +3,7 @@
+ #include "core/formula.h"
+ #include "core/macro.h"
+ #include "fonts/fonts.h"
++#include <cstdlib>
+ #if CLATEX_CXX17
+ #include <filesystem>
+ #endif
+@@ -48,7 +49,7 @@ string LaTeX::queryResourceLocation(string& custom_path) {
+     char* userdata_fallback;
+     asprintf(&userdata_fallback, "%s/.local/share/clatexmath/", home);
+     paths.push(string(userdata_fallback));
+-    delete userdata_fallback;
++    std::free(userdata_fallback);
+   }
+   paths.push("/usr/share/clatexmath/");
+   paths.push("/usr/local/share/clatexmath/");

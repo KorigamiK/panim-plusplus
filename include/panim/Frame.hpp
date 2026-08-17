@@ -17,6 +17,7 @@ namespace panim {
         void clear(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255);
         void set_pixel(int x, int y, uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255);
         uint8_t *pixel_ptr(int x, int y);
+        const uint8_t *pixel_ptr(int x, int y) const;
     };
 
     // Minimal PPM writer for quick smoketests.

@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "EquationMorph.hpp"
 #include "Frame.hpp"
 #include "LatexRenderer.hpp"
 #include "Status.hpp"
@@ -22,6 +23,8 @@ namespace panim {
         void set_center_norm(double nx, double ny) {
             center_norm_x_ = nx;
             center_norm_y_ = ny;
+            for (auto &morph : morphs_)
+                morph.set_center_norm(nx, ny);
         }
         void set_target_height_ratio(double r) { target_height_ratio_ = r; }
         void set_tint(uint8_t r, uint8_t g, uint8_t b) {
@@ -29,6 +32,8 @@ namespace panim {
             tint_g_ = g;
             tint_b_ = b;
             tint_set_ = true;
+            for (auto &morph : morphs_)
+                morph.set_tint(r, g, b);
         }
 
         void add_keyframe(const std::string &latex, double hold_sec, double transition_sec);
@@ -53,6 +58,7 @@ namespace panim {
 
         std::vector<Keyframe> keys_;
         std::vector<Frame> frames_;
+        std::vector<EquationMorph> morphs_;
         std::vector<Segment> segments_;
         double total_duration_ = 0.0;
         double center_norm_x_ = 0.5;

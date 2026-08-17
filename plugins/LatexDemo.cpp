@@ -3,6 +3,7 @@
 #include "panim/LatexRenderer.hpp"
 #include "panim/LatexTrack.hpp"
 #include "panim/Log.hpp"
+#include "panim/Plugin.hpp"
 #include <cmath>
 
 using namespace panim;
@@ -11,6 +12,10 @@ namespace {
 
     class LatexDemo : public Animation {
     public:
+        AnimationInfo info() const override {
+            return {"LatexDemo", 15.0, 1280, 720, 30.0};
+        }
+
         void on_setup(const AnimationContext &ctx) override {
             ctx_ = ctx;
             if (!ctx.latex) {
@@ -83,5 +88,4 @@ namespace {
 
 } // namespace
 
-extern "C" Animation *create_animation() { return new LatexDemo(); }
-extern "C" void destroy_animation(Animation *a) { delete a; }
+PANIM_EXPORT_ANIMATION(LatexDemo)

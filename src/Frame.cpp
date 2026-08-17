@@ -1,12 +1,27 @@
 // Basic RGBA frame utilities.
 #include "panim/Frame.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <fstream>
 
 namespace panim {
 
-    Frame::Frame(int w, int h) : width(w), height(h), pixels(static_cast<size_t>(w * h * 4), 0) {}
+    namespace {
+
+        size_t storage_size(int width, int height) {
+            if (width <= 0 || height <= 0)
+                return 0;
+            return static_cast<size_t>(width) *
+                   static_cast<size_t>(height) * 4;
+        }
+
+    } // namespace
+
+    Frame::Frame(int w, int h)
+        : width(std::max(0, w)),
+          height(std::max(0, h)),
+          pixels(storage_size(w, h), 0) {}
 
     void Frame::clear(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
         for (int y = 0; y < height; ++y) {
@@ -33,7 +48,17 @@ namespace panim {
 
     uint8_t *Frame::pixel_ptr(int x, int y) {
         assert(x >= 0 && y >= 0 && x < width && y < height);
-        size_t idx = static_cast<size_t>((y * width + x) * 4);
+        size_t idx = (static_cast<size_t>(y) * static_cast<size_t>(width) +
+                      static_cast<size_t>(x)) *
+                     4;
+        return pixels.data() + idx;
+    }
+
+    const uint8_t *Frame::pixel_ptr(int x, int y) const {
+        assert(x >= 0 && y >= 0 && x < width && y < height);
+        size_t idx = (static_cast<size_t>(y) * static_cast<size_t>(width) +
+                      static_cast<size_t>(x)) *
+                     4;
         return pixels.data() + idx;
     }
 
