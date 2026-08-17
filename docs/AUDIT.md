@@ -69,6 +69,9 @@ This is now concise enough for examples and in-repository work. The
 - Kept WebGPU adapter selection automatic and moved all environment selection
   language into diagnostic documentation.
 - Fixed tinted `LatexTrack` transitions so morphing glyphs retain their tint.
+- Unified held and transitioning LaTeX endpoint sizes, tightly cropped glyph
+  layers, and interpolated glyph bounds so intentional text-size changes morph
+  continuously instead of snapping at a segment boundary.
 - Fixed FFmpeg frame-rate rational handling and packet duration metadata, so
   fractional rates and one-frame iteration renders are valid.
 - Added draft/share/master encode profiles, 4:4:4 high-fidelity masters,
@@ -79,9 +82,10 @@ This is now concise enough for examples and in-repository work. The
 - Split animation sampling from output through `RenderSession` and `FrameSink`,
   keeping FFmpeg as one final-output sink instead of the authoring loop.
 - Added `preview`, `frame`, and `render` commands. Preview uses a high-DPI
-  SDL3/WebGPU surface, playback and stepping controls, a visible scrub strip,
-  lossless screenshots, automatic adapter selection, and safe plugin reload
-  that preserves the playhead and keeps the previous generation on failure.
+  SDL3/WebGPU surface, a visible clickable transport bar, keyboard playback and
+  stepping controls, lossless screenshots, automatic adapter selection, and
+  safe plugin reload that preserves the playhead and keeps the previous
+  generation on failure.
 - Added explicit `VideoWriter::finish()` error reporting and made the render
   session finalize its sink before reporting success.
 - Captured WebGPU shader/pipeline validation in initialization, allowing a

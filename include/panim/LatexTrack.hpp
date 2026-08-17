@@ -18,6 +18,7 @@ namespace panim {
             std::string latex;
             double hold_sec;
             double transition_sec;
+            double height_scale = 1.0;
         };
 
         void set_center_norm(double nx, double ny) {
@@ -36,7 +37,10 @@ namespace panim {
                 morph.set_tint(r, g, b);
         }
 
-        void add_keyframe(const std::string &latex, double hold_sec, double transition_sec);
+        void add_keyframe(const std::string &latex,
+                          double hold_sec,
+                          double transition_sec,
+                          double height_scale = 1.0);
 
         // Pre-render SVGs to frames. frame_height is the target video height.
         Status prepare(LatexRenderer &renderer, int frame_height);

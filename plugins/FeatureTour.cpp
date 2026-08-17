@@ -113,9 +113,9 @@ namespace {
         void prepare_text() {
             intro_text_.set_center_norm(0.5, 0.47);
             intro_text_.set_target_height_ratio(0.11);
-            intro_text_.add_keyframe("\\text{panim++}", 0.75, 0.0);
+            intro_text_.add_keyframe("\\text{panim++}", 0.75, 0.0, 1.18);
             intro_text_.add_keyframe(
-                "\\text{panim++ / code becomes motion}", 1.15, 0.7);
+                "\\text{panim++ / code becomes motion}", 1.15, 0.7, 0.88);
 
             mandelbulb_text_.set_center_norm(0.5, 0.10);
             mandelbulb_text_.set_target_height_ratio(0.047);

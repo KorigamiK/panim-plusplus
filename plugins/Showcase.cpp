@@ -112,10 +112,14 @@ namespace {
 
                 caption_.set_center_norm(0.5, 0.14);
                 caption_.set_target_height_ratio(0.05);
-                caption_.add_keyframe("\\text{Hardware accel when available}", 1.4, 0.6);
-                caption_.add_keyframe("\\text{Timeline-driven blobs}", 1.4, 0.6);
-                caption_.add_keyframe("\\text{LaTeX overlays (optional)}", 1.4, 0.6);
-                caption_.add_keyframe("\\text{Replace me with your scene}", 1.4, 0.6);
+                caption_.add_keyframe(
+                    "\\text{Hardware accel when available}", 1.4, 0.6, 1.0);
+                caption_.add_keyframe(
+                    "\\text{Timeline-driven blobs}", 1.4, 0.6, 0.82);
+                caption_.add_keyframe(
+                    "\\text{LaTeX overlays (optional)}", 1.4, 0.6, 1.08);
+                caption_.add_keyframe(
+                    "\\text{Replace me with your scene}", 1.4, 0.6, 0.92);
                 auto st2 = caption_.prepare(*ctx.latex, ctx.height);
                 if (!st2.ok) {
                     PANIM_LOG_WARN("Showcase: caption prep failed: {}", st2.message);
@@ -177,10 +181,22 @@ namespace {
             Painter p(frame);
             int step = std::max(32, ctx_.width / 18);
             for (int x = 0; x < ctx_.width; x += step) {
-                p.stroke_line(x, 0, x, ctx_.height, 1, Color{255, 255, 255}, static_cast<float>(alpha));
+                p.stroke_line(x,
+                              0,
+                              x,
+                              ctx_.height,
+                              1,
+                              Color{255, 255, 255},
+                              static_cast<float>(alpha));
             }
             for (int y = 0; y < ctx_.height; y += step) {
-                p.stroke_line(0, y, ctx_.width, y, 1, Color{255, 255, 255}, static_cast<float>(alpha * 0.9));
+                p.stroke_line(0,
+                              y,
+                              ctx_.width,
+                              y,
+                              1,
+                              Color{255, 255, 255},
+                              static_cast<float>(alpha * 0.9));
             }
         }
 
