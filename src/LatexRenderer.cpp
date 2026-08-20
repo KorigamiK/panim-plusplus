@@ -52,8 +52,7 @@ namespace panim {
 
     } // namespace
 
-    LatexRenderer::LatexRenderer(std::filesystem::path scratch_dir)
-        : scratch_dir_(std::move(scratch_dir)) {
+    LatexRenderer::LatexRenderer(std::filesystem::path scratch_dir) : scratch_dir_(std::move(scratch_dir)) {
         std::error_code ec;
         std::filesystem::create_directories(scratch_dir_, ec);
         if (ec) {
@@ -89,15 +88,9 @@ namespace panim {
             return Status::success();
         }
 
-        const std::string command =
-            shell_quote(microtex_bin_) +
-            " -headless" +
-            " " + shell_quote("-foreground=#ffffffff") +
-            " " + shell_quote("-background=#00000000") +
-            " " + shell_quote("-padding=4") +
-            " " + shell_quote("-input=" + latex) +
-            " " + shell_quote("-output=" + out_path.string()) +
-            " >/dev/null 2>&1";
+        const std::string command = shell_quote(microtex_bin_) + " -headless" + " " + shell_quote("-foreground=#ffffffff") + " " +
+                                    shell_quote("-background=#00000000") + " " + shell_quote("-padding=4") + " " + shell_quote("-input=" + latex) +
+                                    " " + shell_quote("-output=" + out_path.string()) + " >/dev/null 2>&1";
         int result = std::system(command.c_str());
         if (result != 0) {
             PANIM_LOG_ERROR("MicroTeX failed (code {}): {}", result, command);
@@ -129,8 +122,7 @@ namespace panim {
             return Status::success();
         }
 
-        return Status::failure(
-            "MicroTeX binary not found. Install 'microtex' on PATH or set MICROTEX_BIN.");
+        return Status::failure("MicroTeX binary not found. Install 'microtex' on PATH or set MICROTEX_BIN.");
     }
 
 } // namespace panim

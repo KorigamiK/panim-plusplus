@@ -79,11 +79,24 @@ Important options:
 All bundled plugins are enabled by default. The primary build products are:
 
 - `build/bin/panim`;
+- `build/plugins/libQuickStart.dylib` on macOS, or `.so` on Linux;
 - `build/plugins/libShowcase.dylib` on macOS, or `.so` on Linux;
 - `build/plugins/libSampleWave.dylib` on macOS, or `.so` on Linux; and
 - `build/plugins/libLatexDemo.dylib` on macOS, or `.so` on Linux; and
 - `build/plugins/libHardwareDemo.dylib` on macOS, or `.so` on Linux; and
 - `build/plugins/libFeatureTour.dylib` on macOS, or `.so` on Linux.
+
+Plugin target names match the names accepted by the CLI. Build only the
+animation you are editing to avoid recompiling unrelated plugins:
+
+```bash
+cmake --build build --target FeatureTour --parallel
+./build/bin/panim frame FeatureTour --time 0 --output panim_out/frame.png
+```
+
+For a configure preset or IDE that uses `build/Debug`, substitute that build
+directory in both commands. `scripts/preview.sh FeatureTour` detects either
+layout, builds only the CLI and `FeatureTour`, and then launches the preview.
 
 ## Preview, inspect, and render
 
@@ -379,8 +392,9 @@ PANIM_EXPORT_ANIMATION(Hello)
 ```
 
 Register in-repository plugins with `panim_add_plugin` in `CMakeLists.txt`.
-See `plugins/FeatureTour.cpp` for scenes, animated properties, equation
-morphing, scaled compositing, and a WGSL Mandelbulb in one animation.
+See `plugins/QuickStart.cpp` for a minimal complete animation. See
+`plugins/FeatureTour.cpp` for scenes, animated properties, equation morphing,
+scaled compositing, and a WGSL Mandelbulb in one animation.
 
 Plugins carry an integer API version through `PANIM_EXPORT_ANIMATION`. Rebuild
 plugin binaries after an engine API change; the loader rejects missing or

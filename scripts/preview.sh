@@ -10,9 +10,19 @@ fi
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "${script_dir}/.." && pwd)"
-build_dir="${PANIM_BUILD_DIR:-${repo_root}/build}"
+
+if [[ -n "${PANIM_BUILD_DIR:-}" ]]; then
+    build_dir="${PANIM_BUILD_DIR}"
+elif [[ -f "${repo_root}/build/CMakeCache.txt" ]]; then
+    build_dir="${repo_root}/build"
+elif [[ -f "${repo_root}/build/Debug/CMakeCache.txt" ]]; then
+    build_dir="${repo_root}/build/Debug"
+else
+    build_dir="${repo_root}/build"
+fi
+
 plugin_name="$1"
 shift
 
-cmake --build "${build_dir}" --target "${plugin_name}" --parallel
+cmake --build "${build_dir}" --target panim "${plugin_name}" --parallel
 exec "${build_dir}/bin/panim" preview "${plugin_name}" "$@"

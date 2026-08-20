@@ -32,14 +32,12 @@ namespace panim {
         }
 
         int interpolate_dimension(int from, int to, double progress) {
-            return std::max(1, static_cast<int>(std::lround(
-                                   from + (to - from) * progress)));
+            return std::max(1, static_cast<int>(std::lround(from + (to - from) * progress)));
         }
 
         bool is_text_expression(const std::string &latex) {
             size_t start = latex.find_first_not_of(" \t\r\n");
-            return start != std::string::npos &&
-                   latex.compare(start, 6, "\\text{") == 0;
+            return start != std::string::npos && latex.compare(start, 6, "\\text{") == 0;
         }
 
         std::string print_node(const tinyxml2::XMLNode &node) {
@@ -48,43 +46,34 @@ namespace panim {
             return printer.CStr();
         }
 
-        const tinyxml2::XMLElement *find_descendant(
-            const tinyxml2::XMLElement *element,
-            std::string_view name) {
+        const tinyxml2::XMLElement *find_descendant(const tinyxml2::XMLElement *element, std::string_view name) {
             if (!element)
                 return nullptr;
             if (element->Name() && name == element->Name())
                 return element;
 
-            for (const tinyxml2::XMLElement *child = element->FirstChildElement();
-                 child;
-                 child = child->NextSiblingElement()) {
+            for (const tinyxml2::XMLElement *child = element->FirstChildElement(); child; child = child->NextSiblingElement()) {
                 if (const auto *match = find_descendant(child, name))
                     return match;
             }
             return nullptr;
         }
 
-        const tinyxml2::XMLElement *find_element_by_id(
-            const tinyxml2::XMLElement *element,
-            std::string_view id) {
+        const tinyxml2::XMLElement *find_element_by_id(const tinyxml2::XMLElement *element, std::string_view id) {
             if (!element)
                 return nullptr;
             const char *element_id = element->Attribute("id");
             if (element_id && id == element_id)
                 return element;
 
-            for (const tinyxml2::XMLElement *child = element->FirstChildElement();
-                 child;
-                 child = child->NextSiblingElement()) {
+            for (const tinyxml2::XMLElement *child = element->FirstChildElement(); child; child = child->NextSiblingElement()) {
                 if (const auto *match = find_element_by_id(child, id))
                     return match;
             }
             return nullptr;
         }
 
-        void append_shape_key(const tinyxml2::XMLElement *element,
-                              std::string &key) {
+        void append_shape_key(const tinyxml2::XMLElement *element, std::string &key) {
             if (!element)
                 return;
 
@@ -100,16 +89,12 @@ namespace panim {
             }
             key.push_back('|');
 
-            for (const tinyxml2::XMLElement *child = element->FirstChildElement();
-                 child;
-                 child = child->NextSiblingElement()) {
+            for (const tinyxml2::XMLElement *child = element->FirstChildElement(); child; child = child->NextSiblingElement()) {
                 append_shape_key(child, key);
             }
         }
 
-        std::string make_layer_svg(const tinyxml2::XMLElement &root,
-                                   const tinyxml2::XMLElement *defs,
-                                   const tinyxml2::XMLElement &layer) {
+        std::string make_layer_svg(const tinyxml2::XMLElement &root, const tinyxml2::XMLElement *defs, const tinyxml2::XMLElement &layer) {
             const char *width = root.Attribute("width");
             const char *height = root.Attribute("height");
             const char *view_box = root.Attribute("viewBox");
@@ -132,8 +117,7 @@ namespace panim {
             return svg.str();
         }
 
-        bool parse_microtex_layout(const std::filesystem::path &path,
-                                   ParsedLayout &layout) {
+        bool parse_microtex_layout(const std::filesystem::path &path, ParsedLayout &layout) {
             tinyxml2::XMLDocument document;
             if (document.LoadFile(path.c_str()) != tinyxml2::XML_SUCCESS)
                 return false;
@@ -148,9 +132,7 @@ namespace panim {
                 return false;
 
             const tinyxml2::XMLElement *defs = root->FirstChildElement("defs");
-            for (const tinyxml2::XMLElement *element = root->FirstChildElement();
-                 element;
-                 element = element->NextSiblingElement()) {
+            for (const tinyxml2::XMLElement *element = root->FirstChildElement(); element; element = element->NextSiblingElement()) {
                 if (element == defs)
                     continue;
 
@@ -190,15 +172,11 @@ namespace panim {
 
                 double alpha_a = pa[3] / 255.0;
                 double alpha_b = pb[3] / 255.0;
-                double mixed_alpha =
-                    (1.0 - clamped) * alpha_a + clamped * alpha_b;
+                double mixed_alpha = (1.0 - clamped) * alpha_a + clamped * alpha_b;
 
-                double r = (1.0 - clamped) * (pa[0] * alpha_a) +
-                           clamped * (pb[0] * alpha_b);
-                double g = (1.0 - clamped) * (pa[1] * alpha_a) +
-                           clamped * (pb[1] * alpha_b);
-                double b = (1.0 - clamped) * (pa[2] * alpha_a) +
-                           clamped * (pb[2] * alpha_b);
+                double r = (1.0 - clamped) * (pa[0] * alpha_a) + clamped * (pb[0] * alpha_b);
+                double g = (1.0 - clamped) * (pa[1] * alpha_a) + clamped * (pb[1] * alpha_b);
+                double b = (1.0 - clamped) * (pa[2] * alpha_a) + clamped * (pb[2] * alpha_b);
 
                 if (mixed_alpha > 0.0001) {
                     po[0] = static_cast<uint8_t>(r / mixed_alpha);
@@ -212,15 +190,8 @@ namespace panim {
             }
         }
 
-        void alpha_over(const Frame &src,
-                        Frame &dst,
-                        int x0,
-                        int y0,
-                        double opacity = 1.0,
-                        bool tint_set = false,
-                        uint8_t tint_r = 255,
-                        uint8_t tint_g = 255,
-                        uint8_t tint_b = 255) {
+        void alpha_over(const Frame &src, Frame &dst, int x0, int y0, double opacity = 1.0, bool tint_set = false, uint8_t tint_r = 255,
+                        uint8_t tint_g = 255, uint8_t tint_b = 255) {
             if (opacity <= 0.0)
                 return;
             for (int y = 0; y < src.height; ++y) {
@@ -231,27 +202,17 @@ namespace panim {
                     int dx = x0 + x;
                     if (dx < 0 || dx >= dst.width)
                         continue;
-                    const uint8_t *sp =
-                        src.pixels.data() + (y * src.width + x) * 4;
+                    const uint8_t *sp = src.pixels.data() + (y * src.width + x) * 4;
                     double alpha = (sp[3] / 255.0) * opacity;
                     if (alpha < 0.0001)
                         continue;
-                    double source_r = tint_set
-                                          ? sp[0] * (tint_r / 255.0)
-                                          : sp[0];
-                    double source_g = tint_set
-                                          ? sp[1] * (tint_g / 255.0)
-                                          : sp[1];
-                    double source_b = tint_set
-                                          ? sp[2] * (tint_b / 255.0)
-                                          : sp[2];
+                    double source_r = tint_set ? sp[0] * (tint_r / 255.0) : sp[0];
+                    double source_g = tint_set ? sp[1] * (tint_g / 255.0) : sp[1];
+                    double source_b = tint_set ? sp[2] * (tint_b / 255.0) : sp[2];
                     uint8_t *dp = dst.pixel_ptr(dx, dy);
-                    dp[0] = static_cast<uint8_t>(
-                        source_r * alpha + dp[0] * (1.0 - alpha));
-                    dp[1] = static_cast<uint8_t>(
-                        source_g * alpha + dp[1] * (1.0 - alpha));
-                    dp[2] = static_cast<uint8_t>(
-                        source_b * alpha + dp[2] * (1.0 - alpha));
+                    dp[0] = static_cast<uint8_t>(source_r * alpha + dp[0] * (1.0 - alpha));
+                    dp[1] = static_cast<uint8_t>(source_g * alpha + dp[1] * (1.0 - alpha));
+                    dp[2] = static_cast<uint8_t>(source_b * alpha + dp[2] * (1.0 - alpha));
                     dp[3] = 255;
                 }
             }
@@ -294,31 +255,13 @@ namespace panim {
             return true;
         }
 
-        void alpha_over_scaled(const Frame &src,
-                               Frame &dst,
-                               int x0,
-                               int y0,
-                               int output_width,
-                               int output_height,
-                               double opacity,
-                               bool tint_set,
-                               uint8_t tint_r,
-                               uint8_t tint_g,
-                               uint8_t tint_b) {
-            if (opacity <= 0.0 || output_width <= 0 || output_height <= 0 ||
-                src.width <= 0 || src.height <= 0) {
+        void alpha_over_scaled(const Frame &src, Frame &dst, int x0, int y0, int output_width, int output_height, double opacity, bool tint_set,
+                               uint8_t tint_r, uint8_t tint_g, uint8_t tint_b) {
+            if (opacity <= 0.0 || output_width <= 0 || output_height <= 0 || src.width <= 0 || src.height <= 0) {
                 return;
             }
             if (output_width == src.width && output_height == src.height) {
-                alpha_over(src,
-                           dst,
-                           x0,
-                           y0,
-                           opacity,
-                           tint_set,
-                           tint_r,
-                           tint_g,
-                           tint_b);
+                alpha_over(src, dst, x0, y0, opacity, tint_set, tint_r, tint_g, tint_b);
                 return;
             }
 
@@ -326,8 +269,7 @@ namespace panim {
                 int destination_y = y0 + y;
                 if (destination_y < 0 || destination_y >= dst.height)
                     continue;
-                double source_y =
-                    (static_cast<double>(y) + 0.5) * src.height / output_height - 0.5;
+                double source_y = (static_cast<double>(y) + 0.5) * src.height / output_height - 0.5;
                 int y1 = static_cast<int>(std::floor(source_y));
                 int y2 = y1 + 1;
                 double fy = source_y - y1;
@@ -338,8 +280,7 @@ namespace panim {
                     int destination_x = x0 + x;
                     if (destination_x < 0 || destination_x >= dst.width)
                         continue;
-                    double source_x =
-                        (static_cast<double>(x) + 0.5) * src.width / output_width - 0.5;
+                    double source_x = (static_cast<double>(x) + 0.5) * src.width / output_width - 0.5;
                     int x1 = static_cast<int>(std::floor(source_x));
                     int x2 = x1 + 1;
                     double fx = source_x - x1;
@@ -384,27 +325,20 @@ namespace panim {
                     }
                     alpha *= opacity;
                     uint8_t *target = dst.pixel_ptr(destination_x, destination_y);
-                    target[0] = static_cast<uint8_t>(
-                        red * alpha + target[0] * (1.0 - alpha));
-                    target[1] = static_cast<uint8_t>(
-                        green * alpha + target[1] * (1.0 - alpha));
-                    target[2] = static_cast<uint8_t>(
-                        blue * alpha + target[2] * (1.0 - alpha));
+                    target[0] = static_cast<uint8_t>(red * alpha + target[0] * (1.0 - alpha));
+                    target[1] = static_cast<uint8_t>(green * alpha + target[1] * (1.0 - alpha));
+                    target[2] = static_cast<uint8_t>(blue * alpha + target[2] * (1.0 - alpha));
                     target[3] = 255;
                 }
             }
         }
 
-        template <typename Layer>
-        double normalized_layer_x(const Layer &layer, int content_width) {
-            return (layer.offset_x + layer.frame.width * 0.5) /
-                   std::max(1.0, static_cast<double>(content_width));
+        template <typename Layer> double normalized_layer_x(const Layer &layer, int content_width) {
+            return (layer.offset_x + layer.frame.width * 0.5) / std::max(1.0, static_cast<double>(content_width));
         }
 
-        template <typename Layer>
-        double normalized_layer_y(const Layer &layer, int content_height) {
-            return (layer.offset_y + layer.frame.height * 0.5) /
-                   std::max(1.0, static_cast<double>(content_height));
+        template <typename Layer> double normalized_layer_y(const Layer &layer, int content_height) {
+            return (layer.offset_y + layer.frame.height * 0.5) / std::max(1.0, static_cast<double>(content_height));
         }
 
         Frame pad_to(const Frame &src, int width, int height) {
@@ -414,8 +348,7 @@ namespace panim {
             int offset_y = (height - src.height) / 2;
             for (int y = 0; y < src.height; ++y) {
                 for (int x = 0; x < src.width; ++x) {
-                    const uint8_t *sp =
-                        src.pixels.data() + (y * src.width + x) * 4;
+                    const uint8_t *sp = src.pixels.data() + (y * src.width + x) * 4;
                     uint8_t *dp = out.pixel_ptr(offset_x + x, offset_y + y);
                     dp[0] = sp[0];
                     dp[1] = sp[1];
@@ -428,10 +361,7 @@ namespace panim {
 
     } // namespace
 
-    Status EquationMorph::init(const std::string &from_latex,
-                               const std::string &to_latex,
-                               LatexRenderer &renderer,
-                               double scale,
+    Status EquationMorph::init(const std::string &from_latex, const std::string &to_latex, LatexRenderer &renderer, double scale,
                                int target_height_px) {
         EquationMorphSizing sizing;
         sizing.from_scale = scale;
@@ -441,17 +371,14 @@ namespace panim {
         return init(from_latex, to_latex, renderer, sizing);
     }
 
-    Status EquationMorph::init(const std::string &from_latex,
-                               const std::string &to_latex,
-                               LatexRenderer &renderer,
+    Status EquationMorph::init(const std::string &from_latex, const std::string &to_latex, LatexRenderer &renderer,
                                const EquationMorphSizing &sizing) {
         ready_flag = false;
         matching_ready = false;
         from_layers.clear();
         to_layers.clear();
         error.clear();
-        text_transition = is_text_expression(from_latex) &&
-                          is_text_expression(to_latex);
+        text_transition = is_text_expression(from_latex) && is_text_expression(to_latex);
 
         std::filesystem::path svg_from;
         std::filesystem::path svg_to;
@@ -466,8 +393,7 @@ namespace panim {
             return Status::failure(error);
         }
 
-        if (!std::isfinite(sizing.from_scale) || sizing.from_scale <= 0.0 ||
-            !std::isfinite(sizing.to_scale) || sizing.to_scale <= 0.0) {
+        if (!std::isfinite(sizing.from_scale) || sizing.from_scale <= 0.0 || !std::isfinite(sizing.to_scale) || sizing.to_scale <= 0.0) {
             error = "EquationMorph endpoint scales must be positive";
             return Status::failure(error);
         }
@@ -479,19 +405,16 @@ namespace panim {
             int from_height = 0;
             int to_width = 0;
             int to_height = 0;
-            if (!svg_dimensions(svg_from, from_width, from_height) ||
-                !svg_dimensions(svg_to, to_width, to_height) ||
-                from_height <= 0 || to_height <= 0) {
+            if (!svg_dimensions(svg_from, from_width, from_height) || !svg_dimensions(svg_to, to_width, to_height) || from_height <= 0 ||
+                to_height <= 0) {
                 error = "Could not measure equation SVGs";
                 return Status::failure(error);
             }
             if (sizing.from_height_px > 0) {
-                from_scale = static_cast<double>(sizing.from_height_px) /
-                             static_cast<double>(from_height);
+                from_scale = static_cast<double>(sizing.from_height_px) / static_cast<double>(from_height);
             }
             if (sizing.to_height_px > 0) {
-                to_scale = static_cast<double>(sizing.to_height_px) /
-                           static_cast<double>(to_height);
+                to_scale = static_cast<double>(sizing.to_height_px) / static_cast<double>(to_height);
             }
         }
 
@@ -519,9 +442,7 @@ namespace panim {
 
         ParsedLayout from_layout;
         ParsedLayout to_layout;
-        if (!text_transition &&
-            parse_microtex_layout(svg_from, from_layout) &&
-            parse_microtex_layout(svg_to, to_layout)) {
+        if (!text_transition && parse_microtex_layout(svg_from, from_layout) && parse_microtex_layout(svg_to, to_layout)) {
             bool layers_ok = true;
             for (const ParsedLayer &parsed : from_layout.layers) {
                 Frame frame(1, 1);
@@ -557,27 +478,18 @@ namespace panim {
             int match_count = 0;
             int pair_count = 0;
             if (layers_ok) {
-                for (size_t from_index = 0;
-                     from_index < from_layout.layers.size();
-                     ++from_index) {
+                for (size_t from_index = 0; from_index < from_layout.layers.size(); ++from_index) {
                     int best_index = -1;
                     double best_distance = std::numeric_limits<double>::max();
                     const ParsedLayer &source = from_layout.layers[from_index];
-                    for (size_t to_index = 0;
-                         to_index < to_layout.layers.size();
-                         ++to_index) {
-                        if (to_layers[to_index].matched ||
-                            source.shape_key != to_layout.layers[to_index].shape_key) {
+                    for (size_t to_index = 0; to_index < to_layout.layers.size(); ++to_index) {
+                        if (to_layers[to_index].matched || source.shape_key != to_layout.layers[to_index].shape_key) {
                             continue;
                         }
-                        double source_x = normalized_layer_x(
-                            from_layers[from_index], from_content_width);
-                        double source_y = normalized_layer_y(
-                            from_layers[from_index], from_content_height);
-                        double target_x = normalized_layer_x(
-                            to_layers[to_index], to_content_width);
-                        double target_y = normalized_layer_y(
-                            to_layers[to_index], to_content_height);
+                        double source_x = normalized_layer_x(from_layers[from_index], from_content_width);
+                        double source_y = normalized_layer_y(from_layers[from_index], from_content_height);
+                        double target_x = normalized_layer_x(to_layers[to_index], to_content_width);
+                        double target_y = normalized_layer_y(to_layers[to_index], to_content_height);
                         double dx = target_x - source_x;
                         double dy = target_y - source_y;
                         double distance = dx * dx + dy * dy;
@@ -597,29 +509,20 @@ namespace panim {
                 // an equation transition. Pair the remaining layers by
                 // normalized proximity so different letters share a motion
                 // path and cross-shape instead of leaving a visual hole.
-                for (size_t from_index = 0;
-                     from_index < from_layout.layers.size();
-                     ++from_index) {
+                for (size_t from_index = 0; from_index < from_layout.layers.size(); ++from_index) {
                     if (from_layers[from_index].match_index >= 0)
                         continue;
 
                     int best_index = -1;
                     double best_distance = std::numeric_limits<double>::max();
-                    for (size_t to_index = 0;
-                         to_index < to_layout.layers.size();
-                         ++to_index) {
-                        if (to_layers[to_index].matched ||
-                            to_layers[to_index].paired) {
+                    for (size_t to_index = 0; to_index < to_layout.layers.size(); ++to_index) {
+                        if (to_layers[to_index].matched || to_layers[to_index].paired) {
                             continue;
                         }
-                        double source_x = normalized_layer_x(
-                            from_layers[from_index], from_content_width);
-                        double source_y = normalized_layer_y(
-                            from_layers[from_index], from_content_height);
-                        double target_x = normalized_layer_x(
-                            to_layers[to_index], to_content_width);
-                        double target_y = normalized_layer_y(
-                            to_layers[to_index], to_content_height);
+                        double source_x = normalized_layer_x(from_layers[from_index], from_content_width);
+                        double source_y = normalized_layer_y(from_layers[from_index], from_content_height);
+                        double target_x = normalized_layer_x(to_layers[to_index], to_content_width);
+                        double target_y = normalized_layer_y(to_layers[to_index], to_content_height);
                         double dx = target_x - source_x;
                         double dy = target_y - source_y;
                         double distance = dx * dx + dy * dy;
@@ -635,13 +538,9 @@ namespace panim {
                     }
                 }
                 matching_ready = true;
-                PANIM_LOG_INFO(
-                    "EquationMorph: matched {} and paired {} of {} source layers "
-                    "({} target layers)",
-                    match_count,
-                    pair_count,
-                    from_layers.size(),
-                    to_layers.size());
+                PANIM_LOG_INFO("EquationMorph: matched {} and paired {} of {} source layers "
+                               "({} target layers)",
+                               match_count, pair_count, from_layers.size(), to_layers.size());
             } else {
                 from_layers.clear();
                 to_layers.clear();
@@ -649,11 +548,9 @@ namespace panim {
         }
 
         if (text_transition) {
-            PANIM_LOG_INFO(
-                "EquationMorph: using size-aware text transition");
+            PANIM_LOG_INFO("EquationMorph: using size-aware text transition");
         } else if (!matching_ready) {
-            PANIM_LOG_WARN(
-                "EquationMorph: glyph parsing unavailable; using whole-equation crossfade");
+            PANIM_LOG_WARN("EquationMorph: glyph parsing unavailable; using whole-equation crossfade");
         }
 
         ready_flag = true;
@@ -675,27 +572,11 @@ namespace panim {
         int base_y = center_position_y - from_frame.height / 2;
 
         if (clamped <= 0.0) {
-            alpha_over(from_frame,
-                       target,
-                       base_x,
-                       base_y,
-                       1.0,
-                       tint_set,
-                       tint_r,
-                       tint_g,
-                       tint_b);
+            alpha_over(from_frame, target, base_x, base_y, 1.0, tint_set, tint_r, tint_g, tint_b);
             return;
         }
         if (clamped >= 1.0) {
-            alpha_over(to_frame,
-                       target,
-                       base_x,
-                       base_y,
-                       1.0,
-                       tint_set,
-                       tint_r,
-                       tint_g,
-                       tint_b);
+            alpha_over(to_frame, target, base_x, base_y, 1.0, tint_set, tint_r, tint_g, tint_b);
             return;
         }
 
@@ -704,58 +585,27 @@ namespace panim {
             Frame blended(from_frame.width, from_frame.height);
             blended.clear(0, 0, 0, 0);
             blend_frames(from_frame, to_frame, blended, eased);
-            alpha_over(blended,
-                       target,
-                       base_x,
-                       base_y,
-                       1.0,
-                       tint_set,
-                       tint_r,
-                       tint_g,
-                       tint_b);
+            alpha_over(blended, target, base_x, base_y, 1.0, tint_set, tint_r, tint_g, tint_b);
             return;
         }
 
         if (text_transition) {
-            int content_width = interpolate_dimension(
-                from_content_width, to_content_width, eased);
-            int content_height = interpolate_dimension(
-                from_content_height, to_content_height, eased);
-            int separation = static_cast<int>(std::lround(
-                std::sin(clamped * 3.14159265358979323846) *
-                std::max(from_content_height, to_content_height) * 0.72));
-            double outgoing_opacity =
-                1.0 - smoothstep((clamped - 0.35) / 0.65);
+            int content_width = interpolate_dimension(from_content_width, to_content_width, eased);
+            int content_height = interpolate_dimension(from_content_height, to_content_height, eased);
+            int separation =
+                static_cast<int>(std::lround(std::sin(clamped * 3.14159265358979323846) * std::max(from_content_height, to_content_height) * 0.72));
+            double outgoing_opacity = 1.0 - smoothstep((clamped - 0.35) / 0.65);
             double incoming_opacity = smoothstep(clamped / 0.65);
             int content_x = center_position_x - content_width / 2;
             int content_y = center_position_y - content_height / 2;
-            alpha_over_scaled(from_content_frame,
-                              target,
-                              content_x,
-                              content_y - separation,
-                              content_width,
-                              content_height,
-                              outgoing_opacity,
-                              tint_set,
-                              tint_r,
-                              tint_g,
-                              tint_b);
-            alpha_over_scaled(to_content_frame,
-                              target,
-                              content_x,
-                              content_y + separation,
-                              content_width,
-                              content_height,
-                              incoming_opacity,
-                              tint_set,
-                              tint_r,
-                              tint_g,
-                              tint_b);
+            alpha_over_scaled(from_content_frame, target, content_x, content_y - separation, content_width, content_height, outgoing_opacity,
+                              tint_set, tint_r, tint_g, tint_b);
+            alpha_over_scaled(to_content_frame, target, content_x, content_y + separation, content_width, content_height, incoming_opacity, tint_set,
+                              tint_r, tint_g, tint_b);
             return;
         }
 
-        int drift = std::max(
-            3, static_cast<int>(std::lround(from_frame.height * 0.08)));
+        int drift = std::max(3, static_cast<int>(std::lround(from_frame.height * 0.08)));
         int from_padding_x = (from_frame.width - from_content_width) / 2;
         int from_padding_y = (from_frame.height - from_content_height) / 2;
         int to_padding_x = (to_frame.width - to_content_width) / 2;
@@ -766,83 +616,30 @@ namespace panim {
             double source_y = base_y + from_padding_y + source.offset_y;
             if (source.match_index >= 0) {
                 const GlyphLayer &destination = to_layers[source.match_index];
-                double destination_x =
-                    base_x + to_padding_x + destination.offset_x;
-                double destination_y =
-                    base_y + to_padding_y + destination.offset_y;
-                int layer_x = static_cast<int>(std::lround(
-                    source_x + (destination_x - source_x) * eased));
-                int layer_y = static_cast<int>(std::lround(
-                    source_y + (destination_y - source_y) * eased));
-                int layer_width = interpolate_dimension(
-                    source.frame.width, destination.frame.width, eased);
-                int layer_height = interpolate_dimension(
-                    source.frame.height, destination.frame.height, eased);
+                double destination_x = base_x + to_padding_x + destination.offset_x;
+                double destination_y = base_y + to_padding_y + destination.offset_y;
+                int layer_x = static_cast<int>(std::lround(source_x + (destination_x - source_x) * eased));
+                int layer_y = static_cast<int>(std::lround(source_y + (destination_y - source_y) * eased));
+                int layer_width = interpolate_dimension(source.frame.width, destination.frame.width, eased);
+                int layer_height = interpolate_dimension(source.frame.height, destination.frame.height, eased);
                 const Frame &shape =
-                    source.frame.width * source.frame.height >=
-                            destination.frame.width * destination.frame.height
-                        ? source.frame
-                        : destination.frame;
-                alpha_over_scaled(shape,
-                                  target,
-                                  layer_x,
-                                  layer_y,
-                                  layer_width,
-                                  layer_height,
-                                  1.0,
-                                  tint_set,
-                                  tint_r,
-                                  tint_g,
-                                  tint_b);
+                    source.frame.width * source.frame.height >= destination.frame.width * destination.frame.height ? source.frame : destination.frame;
+                alpha_over_scaled(shape, target, layer_x, layer_y, layer_width, layer_height, 1.0, tint_set, tint_r, tint_g, tint_b);
             } else if (source.pair_index >= 0) {
                 const GlyphLayer &destination = to_layers[source.pair_index];
-                double destination_x =
-                    base_x + to_padding_x + destination.offset_x;
-                double destination_y =
-                    base_y + to_padding_y + destination.offset_y;
-                int layer_x = static_cast<int>(std::lround(
-                    source_x + (destination_x - source_x) * eased));
-                int layer_y = static_cast<int>(std::lround(
-                    source_y + (destination_y - source_y) * eased));
-                int layer_width = interpolate_dimension(
-                    source.frame.width, destination.frame.width, eased);
-                int layer_height = interpolate_dimension(
-                    source.frame.height, destination.frame.height, eased);
-                alpha_over_scaled(source.frame,
-                                  target,
-                                  layer_x,
-                                  layer_y,
-                                  layer_width,
-                                  layer_height,
-                                  1.0 - eased,
-                                  tint_set,
-                                  tint_r,
-                                  tint_g,
-                                  tint_b);
-                alpha_over_scaled(destination.frame,
-                                  target,
-                                  layer_x,
-                                  layer_y,
-                                  layer_width,
-                                  layer_height,
-                                  eased,
-                                  tint_set,
-                                  tint_r,
-                                  tint_g,
-                                  tint_b);
+                double destination_x = base_x + to_padding_x + destination.offset_x;
+                double destination_y = base_y + to_padding_y + destination.offset_y;
+                int layer_x = static_cast<int>(std::lround(source_x + (destination_x - source_x) * eased));
+                int layer_y = static_cast<int>(std::lround(source_y + (destination_y - source_y) * eased));
+                int layer_width = interpolate_dimension(source.frame.width, destination.frame.width, eased);
+                int layer_height = interpolate_dimension(source.frame.height, destination.frame.height, eased);
+                alpha_over_scaled(source.frame, target, layer_x, layer_y, layer_width, layer_height, 1.0 - eased, tint_set, tint_r, tint_g, tint_b);
+                alpha_over_scaled(destination.frame, target, layer_x, layer_y, layer_width, layer_height, eased, tint_set, tint_r, tint_g, tint_b);
             } else {
                 int layer_x = static_cast<int>(std::lround(source_x));
                 int layer_y = static_cast<int>(std::lround(source_y));
                 layer_y -= static_cast<int>(std::lround(drift * eased));
-                alpha_over(source.frame,
-                           target,
-                           layer_x,
-                           layer_y,
-                           1.0 - eased,
-                           tint_set,
-                           tint_r,
-                           tint_g,
-                           tint_b);
+                alpha_over(source.frame, target, layer_x, layer_y, 1.0 - eased, tint_set, tint_r, tint_g, tint_b);
             }
         }
 
@@ -850,17 +647,8 @@ namespace panim {
             if (destination.matched || destination.paired)
                 continue;
             int layer_x = base_x + to_padding_x + destination.offset_x;
-            int layer_y = base_y + to_padding_y + destination.offset_y +
-                          static_cast<int>(std::lround(drift * (1.0 - eased)));
-            alpha_over(destination.frame,
-                       target,
-                       layer_x,
-                       layer_y,
-                       eased,
-                       tint_set,
-                       tint_r,
-                       tint_g,
-                       tint_b);
+            int layer_y = base_y + to_padding_y + destination.offset_y + static_cast<int>(std::lround(drift * (1.0 - eased)));
+            alpha_over(destination.frame, target, layer_x, layer_y, eased, tint_set, tint_r, tint_g, tint_b);
         }
     }
 
