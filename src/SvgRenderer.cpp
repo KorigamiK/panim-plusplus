@@ -22,10 +22,7 @@ namespace panim {
             SvgImage(const SvgImage &) = delete;
             SvgImage &operator=(const SvgImage &) = delete;
 
-            SvgImage(SvgImage &&other) noexcept
-                : handle(other.handle), width(other.width), height(other.height) {
-                other.handle = nullptr;
-            }
+            SvgImage(SvgImage &&other) noexcept : handle(other.handle), width(other.width), height(other.height) { other.handle = nullptr; }
 
             ~SvgImage() {
                 if (handle)
@@ -67,8 +64,7 @@ namespace panim {
         SvgImage load_svg_data(std::string_view data) {
             GError *err = nullptr;
             SvgImage img;
-            img.handle = rsvg_handle_new_from_data(
-                reinterpret_cast<const guint8 *>(data.data()), data.size(), &err);
+            img.handle = rsvg_handle_new_from_data(reinterpret_cast<const guint8 *>(data.data()), data.size(), &err);
             if (!img.handle) {
                 std::string msg = err ? err->message : "unknown error";
                 if (err)
@@ -84,9 +80,7 @@ namespace panim {
             return img;
         }
 
-        void alpha_blend(Frame &dst, int dst_x, int dst_y,
-                         const std::vector<uint8_t> &src, int src_w, int src_h,
-                         int src_stride) {
+        void alpha_blend(Frame &dst, int dst_x, int dst_y, const std::vector<uint8_t> &src, int src_w, int src_h, int src_stride) {
             for (int y = 0; y < src_h; ++y) {
                 int fy = dst_y + y;
                 if (fy < 0 || fy >= dst.height)
@@ -117,11 +111,7 @@ namespace panim {
             }
         }
 
-        bool render_image_to_frame(SvgImage &img,
-                                   Frame &frame,
-                                   int dst_x,
-                                   int dst_y,
-                                   double scale) {
+        bool render_image_to_frame(SvgImage &img, Frame &frame, int dst_x, int dst_y, double scale) {
             int out_w = static_cast<int>(std::lround(img.width * scale));
             int out_h = static_cast<int>(std::lround(img.height * scale));
             if (out_w <= 0 || out_h <= 0)
@@ -130,16 +120,14 @@ namespace panim {
             int stride = cairo_format_stride_for_width(CAIRO_FORMAT_ARGB32, out_w);
             std::vector<uint8_t> raw(static_cast<size_t>(stride * out_h), 0);
 
-            cairo_surface_t *surface = cairo_image_surface_create_for_data(
-                raw.data(), CAIRO_FORMAT_ARGB32, out_w, out_h, stride);
+            cairo_surface_t *surface = cairo_image_surface_create_for_data(raw.data(), CAIRO_FORMAT_ARGB32, out_w, out_h, stride);
             cairo_t *cr = cairo_create(surface);
             cairo_set_antialias(cr, CAIRO_ANTIALIAS_BEST);
 
             // librsvg scales the document into the supplied viewport. Using the
             // intrinsic size here only painted an unscaled equation into the
             // top-left corner of a larger transparent surface.
-            RsvgRectangle viewport{0, 0, static_cast<double>(out_w),
-                                   static_cast<double>(out_h)};
+            RsvgRectangle viewport{0, 0, static_cast<double>(out_w), static_cast<double>(out_h)};
             GError *err = nullptr;
             if (!rsvg_handle_render_document(img.handle, cr, &viewport, &err)) {
                 if (err) {
@@ -198,11 +186,7 @@ namespace panim {
 
     } // namespace
 
-    bool render_svg_to_frame(const std::filesystem::path &svg_path,
-                             Frame &frame,
-                             int dst_x,
-                             int dst_y,
-                             double scale) {
+    bool render_svg_to_frame(const std::filesystem::path &svg_path, Frame &frame, int dst_x, int dst_y, double scale) {
         if (!std::filesystem::exists(svg_path))
             return false;
         SvgImage img = load_svg(svg_path);

@@ -12,9 +12,7 @@ namespace {
 
     class LatexDemo : public Animation {
     public:
-        AnimationInfo info() const override {
-            return {"LatexDemo", 15.0, 1280, 720, 30.0};
-        }
+        AnimationInfo info() const override { return {"LatexDemo", 15.0, 1280, 720, 30.0}; }
 
         void on_setup(const AnimationContext &ctx) override {
             ctx_ = ctx;
@@ -28,8 +26,11 @@ namespace {
 
             // Main timeline (tables + algebra).
             main_.add_keyframe("\\begin{tabular}{|c|c|} \\hline \\textbf{Depth} & \\textbf{Nodes} \\\\ \\hline \\end{tabular}", 1.0, 0.6);
-            main_.add_keyframe("\\begin{tabular}{|c|c|} \\hline \\textbf{Depth} & \\textbf{Nodes} \\\\ \\hline 0 & 1 \\\\ \\hline \\end{tabular}", 0.8, 0.6);
-            main_.add_keyframe("\\begin{tabular}{|c|c|} \\hline \\textbf{Depth} & \\textbf{Nodes} \\\\ \\hline 0 & 1 \\\\ \\hline 1 & 7 \\\\ \\hline \\end{tabular}", 0.8, 0.6);
+            main_.add_keyframe("\\begin{tabular}{|c|c|} \\hline \\textbf{Depth} & \\textbf{Nodes} \\\\ \\hline 0 & 1 \\\\ \\hline \\end{tabular}",
+                               0.8, 0.6);
+            main_.add_keyframe(
+                "\\begin{tabular}{|c|c|} \\hline \\textbf{Depth} & \\textbf{Nodes} \\\\ \\hline 0 & 1 \\\\ \\hline 1 & 7 \\\\ \\hline \\end{tabular}",
+                0.8, 0.6);
             main_.add_keyframe("\\frac{1}{x}=\\frac{x}{y}=\\frac{y}{2}", 1.0, 0.6);
             main_.add_keyframe("1 \\cdot 2 = x \\cdot x", 0.8, 0.6);
             main_.add_keyframe("2 = x^2", 0.8, 0.6);

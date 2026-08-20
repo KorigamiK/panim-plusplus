@@ -79,11 +79,24 @@ Important options:
 All bundled plugins are enabled by default. The primary build products are:
 
 - `build/bin/panim`;
+- `build/plugins/libQuickStart.dylib` on macOS, or `.so` on Linux;
 - `build/plugins/libShowcase.dylib` on macOS, or `.so` on Linux;
 - `build/plugins/libSampleWave.dylib` on macOS, or `.so` on Linux; and
 - `build/plugins/libLatexDemo.dylib` on macOS, or `.so` on Linux; and
 - `build/plugins/libHardwareDemo.dylib` on macOS, or `.so` on Linux; and
 - `build/plugins/libFeatureTour.dylib` on macOS, or `.so` on Linux.
+
+Plugin target names match the names accepted by the CLI. Build only the
+animation you are editing to avoid recompiling unrelated plugins:
+
+```bash
+cmake --build build --target FeatureTour --parallel
+./build/bin/panim frame FeatureTour --time 0 --output panim_out/frame.png
+```
+
+For a configure preset or IDE that uses `build/Debug`, substitute that build
+directory in both commands. `scripts/preview.sh FeatureTour` detects either
+layout, builds only the CLI and `FeatureTour`, and then launches the preview.
 
 ## Preview, inspect, and render
 
@@ -109,12 +122,14 @@ The normal authoring loop has three explicit commands:
 `preview` renders the plugin's native canvas directly into a high-DPI WebGPU
 surface. It uploads the completed RGBA frame to one presentation texture,
 preserves aspect ratio, and does not round-trip through H.264 or a temporary
-video. The bottom strip is the timeline:
+video. Its visible transport bar provides restart, previous-frame, play/pause,
+next-frame, timeline, PNG-capture, and plugin-reload controls. The matching
+keyboard shortcuts are:
 
 - Space plays or pauses;
 - Left/Right steps one frame, and Shift+Left/Right steps one second;
 - Home/End seek to the timeline boundaries;
-- clicking or dragging the bottom strip scrubs;
+- clicking or dragging the timeline scrubs;
 - S writes a lossless PNG to `panim_out/` (or the `--output` directory);
 - R reloads the plugin immediately; and
 - Escape closes the preview.
@@ -242,10 +257,20 @@ path, and cross-shape; only excess glyphs fade independently. Related
 expressions therefore morph best—for example, rearranging one identity—while
 unrelated expressions retain visual density through the midpoint.
 
-`LatexTrack` uses that same glyph-aware transition for ordinary text. It is not
-a whole-image crossfade: reusable letter shapes move to their new positions,
-and different letters travel together while changing shape. Giving text
-keyframes a transition of roughly 0.5–0.8 seconds makes the motion easy to read.
+`LatexTrack` chooses a transition that fits the content. Math uses the
+glyph-aware morph above. Pure `\text{}` phrases use a size-aware vertical push
+dissolve, which avoids turning unrelated sentences into a brief tangle of
+half-letters. Endpoint raster sizes are shared by held and transitioning frames,
+so expressions do not jump when their natural SVG bounds differ. An optional
+fourth `add_keyframe` argument sets an intentional relative height, which then
+changes continuously:
+
+```cpp
+track.add_keyframe("\\text{large title}", 0.8, 0.0, 1.2);
+track.add_keyframe("\\text{smaller detail}", 1.2, 0.7, 0.85);
+```
+
+Transitions around 0.5–0.8 seconds usually make the motion easy to read.
 
 ## Portable WebGPU compute
 
@@ -367,8 +392,9 @@ PANIM_EXPORT_ANIMATION(Hello)
 ```
 
 Register in-repository plugins with `panim_add_plugin` in `CMakeLists.txt`.
-See `plugins/FeatureTour.cpp` for scenes, animated properties, equation
-morphing, scaled compositing, and a WGSL Mandelbulb in one animation.
+See `plugins/QuickStart.cpp` for a minimal complete animation. See
+`plugins/FeatureTour.cpp` for scenes, animated properties, equation morphing,
+scaled compositing, and a WGSL Mandelbulb in one animation.
 
 Plugins carry an integer API version through `PANIM_EXPORT_ANIMATION`. Rebuild
 plugin binaries after an engine API change; the loader rejects missing or

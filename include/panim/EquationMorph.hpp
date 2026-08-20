@@ -10,6 +10,13 @@
 
 namespace panim {
 
+    struct EquationMorphSizing {
+        double from_scale = 1.0;
+        double to_scale = 1.0;
+        int from_height_px = -1;
+        int to_height_px = -1;
+    };
+
     struct EquationMorph {
         // Provide LaTeX strings to morph between. scale is applied at rasterization.
         Status init(const std::string &from_latex,
@@ -17,6 +24,13 @@ namespace panim {
                     LatexRenderer &renderer,
                     double scale = 1.0,
                     int target_height_px = -1);
+
+        // Use independent endpoint heights when the animation intentionally
+        // changes text size. A negative height leaves that endpoint at scale.
+        Status init(const std::string &from_latex,
+                    const std::string &to_latex,
+                    LatexRenderer &renderer,
+                    const EquationMorphSizing &sizing);
 
         // Set desired center position where the morph should be placed when rendering.
         void set_center(int cx, int cy) {
@@ -37,9 +51,9 @@ namespace panim {
             tint_set = true;
         }
 
-        // Matching glyph outlines move to their new positions. Different
-        // glyphs are paired by proximity, move together, and cross-shape.
-        // Only excess elements fade independently. t is in [0, 1].
+        // Math matches glyph outlines and moves them to their new positions.
+        // Pure \text{} phrases use a size-aware push dissolve so unrelated
+        // sentences remain legible through the transition. t is in [0, 1].
         void render(Frame &target, double t) const;
 
         bool ready() const { return ready_flag; }
@@ -48,8 +62,8 @@ namespace panim {
     private:
         struct GlyphLayer {
             Frame frame{0, 0};
-            double anchor_x = 0.0;
-            double anchor_y = 0.0;
+            int offset_x = 0;
+            int offset_y = 0;
             int match_index = -1;
             int pair_index = -1;
             bool matched = false;
@@ -58,6 +72,8 @@ namespace panim {
 
         Frame from_frame{0, 0};
         Frame to_frame{0, 0};
+        Frame from_content_frame{0, 0};
+        Frame to_content_frame{0, 0};
         std::vector<GlyphLayer> from_layers;
         std::vector<GlyphLayer> to_layers;
         int from_content_width = 0;
@@ -68,9 +84,9 @@ namespace panim {
         int center_y = 0;
         double center_norm_x = 0.5;
         double center_norm_y = 0.8;
-        double raster_scale = 1.0;
         bool use_norm_center = false;
         bool matching_ready = false;
+        bool text_transition = false;
         bool ready_flag = false;
         uint8_t tint_r = 255;
         uint8_t tint_g = 255;

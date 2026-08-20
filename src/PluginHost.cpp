@@ -15,14 +15,11 @@ namespace panim {
 
     namespace {
 
-        template <typename Fn>
-        Fn load_symbol(void *handle, const char *name) {
+        template <typename Fn> Fn load_symbol(void *handle, const char *name) {
 #ifdef _WIN32
             auto symbol = GetProcAddress(static_cast<HMODULE>(handle), name);
             if (!symbol) {
-                PANIM_LOG_ERROR("Failed to load symbol {} (Windows error {})",
-                                name,
-                                GetLastError());
+                PANIM_LOG_ERROR("Failed to load symbol {} (Windows error {})", name, GetLastError());
                 return nullptr;
             }
             return reinterpret_cast<Fn>(symbol);
@@ -43,9 +40,7 @@ namespace panim {
 #ifdef _WIN32
         handle_ = LoadLibraryW(path_.wstring().c_str());
         if (!handle_) {
-            status_ = Status::failure(
-                "Unable to open plugin (Windows error " +
-                std::to_string(GetLastError()) + ")");
+            status_ = Status::failure("Unable to open plugin (Windows error " + std::to_string(GetLastError()) + ")");
             PANIM_LOG_ERROR(status_.message);
             return;
         }
@@ -58,21 +53,17 @@ namespace panim {
         }
 #endif
 
-        api_version_fn_ = load_symbol<PluginApiVersionFn>(
-            handle_, "panim_plugin_api_version");
+        api_version_fn_ = load_symbol<PluginApiVersionFn>(handle_, "panim_plugin_api_version");
         if (!api_version_fn_) {
-            status_ = Status::failure(
-                "Plugin API version symbol missing; rebuild the plugin with "
-                "PANIM_EXPORT_ANIMATION");
+            status_ = Status::failure("Plugin API version symbol missing; rebuild the plugin with "
+                                      "PANIM_EXPORT_ANIMATION");
             PANIM_LOG_ERROR(status_.message);
             return;
         }
         uint32_t api_version = api_version_fn_();
         if (api_version != plugin_api_version) {
-            status_ = Status::failure(
-                "Plugin API version mismatch: plugin=" +
-                std::to_string(api_version) +
-                ", engine=" + std::to_string(plugin_api_version));
+            status_ = Status::failure("Plugin API version mismatch: plugin=" + std::to_string(api_version) +
+                                      ", engine=" + std::to_string(plugin_api_version));
             PANIM_LOG_ERROR(status_.message);
             return;
         }
@@ -80,8 +71,7 @@ namespace panim {
         create_fn_ = load_symbol<CreateAnimationFn>(handle_, "create_animation");
         // destroy_animation is optional; fall back to delete.
 #ifdef _WIN32
-        destroy_fn_ = reinterpret_cast<DestroyAnimationFn>(
-            GetProcAddress(static_cast<HMODULE>(handle_), "destroy_animation"));
+        destroy_fn_ = reinterpret_cast<DestroyAnimationFn>(GetProcAddress(static_cast<HMODULE>(handle_), "destroy_animation"));
 #else
         dlerror();
         destroy_fn_ = reinterpret_cast<DestroyAnimationFn>(dlsym(handle_, "destroy_animation"));

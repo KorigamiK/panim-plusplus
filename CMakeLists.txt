@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.18)
 project(panimpp LANGUAGES CXX)
 
 option(PANIM_ENABLE_HWACCEL "Enable SIMD-friendly compiler flags" ON)
+option(PANIM_BUILD_QUICK_START "Build the minimal authoring demo plugin" ON)
 option(PANIM_BUILD_SAMPLE_PLUGIN "Build the bundled sample animation plugin" ON)
 option(PANIM_BUILD_LATEX_DEMO "Build a LatexDemo plugin" ON)
 option(PANIM_BUILD_SHOWCASE_PLUGIN "Build the Showcase timeline demo plugin" ON)
@@ -227,42 +228,40 @@ set_target_properties(panim PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 
-function(panim_add_plugin target source output_name)
+function(panim_add_plugin target source)
     add_library(${target} SHARED ${source})
     target_link_libraries(${target} PRIVATE panim_core)
     if(NOT MSVC)
         target_compile_options(${target} PRIVATE -fno-exceptions)
     endif()
     set_target_properties(${target} PROPERTIES
-        OUTPUT_NAME ${output_name}
         LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/plugins
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/plugins
     )
 endfunction()
 
+if(PANIM_BUILD_QUICK_START)
+    panim_add_plugin(QuickStart plugins/QuickStart.cpp)
+endif()
+
 if(PANIM_BUILD_SAMPLE_PLUGIN)
-    panim_add_plugin(sample_wave plugins/SampleWave.cpp SampleWave)
-    add_custom_target(SampleWave DEPENDS sample_wave)
+    panim_add_plugin(SampleWave plugins/SampleWave.cpp)
 endif()
 
 if(PANIM_BUILD_LATEX_DEMO)
-    panim_add_plugin(latex_demo plugins/LatexDemo.cpp LatexDemo)
-    add_custom_target(LatexDemo DEPENDS latex_demo)
+    panim_add_plugin(LatexDemo plugins/LatexDemo.cpp)
 endif()
 
 if(PANIM_BUILD_SHOWCASE_PLUGIN)
-    panim_add_plugin(showcase plugins/Showcase.cpp Showcase)
-    add_custom_target(Showcase DEPENDS showcase)
+    panim_add_plugin(Showcase plugins/Showcase.cpp)
 endif()
 
 if(PANIM_BUILD_HARDWARE_DEMO)
-    panim_add_plugin(hardware_demo plugins/HardwareDemo.cpp HardwareDemo)
-    add_custom_target(HardwareDemo DEPENDS hardware_demo)
+    panim_add_plugin(HardwareDemo plugins/HardwareDemo.cpp)
 endif()
 
 if(PANIM_BUILD_FEATURE_TOUR)
-    panim_add_plugin(feature_tour plugins/FeatureTour.cpp FeatureTour)
-    add_custom_target(FeatureTour DEPENDS feature_tour)
+    panim_add_plugin(FeatureTour plugins/FeatureTour.cpp)
 endif()
 
 include(GNUInstallDirs)
@@ -273,36 +272,43 @@ install(TARGETS panim panim_core
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
+if(PANIM_BUILD_QUICK_START)
+    install(TARGETS QuickStart
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/panim/plugins
+        RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/panim/plugins
+    )
+endif()
+
 if(PANIM_BUILD_SAMPLE_PLUGIN)
-    install(TARGETS sample_wave
+    install(TARGETS SampleWave
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/panim/plugins
         RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/panim/plugins
     )
 endif()
 
 if(PANIM_BUILD_LATEX_DEMO)
-    install(TARGETS latex_demo
+    install(TARGETS LatexDemo
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/panim/plugins
         RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/panim/plugins
     )
 endif()
 
 if(PANIM_BUILD_SHOWCASE_PLUGIN)
-    install(TARGETS showcase
+    install(TARGETS Showcase
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/panim/plugins
         RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/panim/plugins
     )
 endif()
 
 if(PANIM_BUILD_HARDWARE_DEMO)
-    install(TARGETS hardware_demo
+    install(TARGETS HardwareDemo
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/panim/plugins
         RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/panim/plugins
     )
 endif()
 
 if(PANIM_BUILD_FEATURE_TOUR)
-    install(TARGETS feature_tour
+    install(TARGETS FeatureTour
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/panim/plugins
         RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/panim/plugins
     )

@@ -4,16 +4,11 @@
 
 namespace panim {
 
-    RenderSession::RenderSession(Animation &animation,
-                                 const RenderSessionOptions &options)
-        : animation_(animation),
-          options_(options),
-          frame_(options.width, options.height) {}
+    RenderSession::RenderSession(Animation &animation, const RenderSessionOptions &options)
+        : animation_(animation), options_(options), frame_(options.width, options.height) {}
 
     Status RenderSession::setup() {
-        if (options_.width <= 0 || options_.height <= 0 ||
-            options_.fps <= 0.0 || options_.duration <= 0.0 ||
-            !std::isfinite(options_.fps) ||
+        if (options_.width <= 0 || options_.height <= 0 || options_.fps <= 0.0 || options_.duration <= 0.0 || !std::isfinite(options_.fps) ||
             !std::isfinite(options_.duration)) {
             return Status::failure("Invalid render session settings");
         }
@@ -41,9 +36,7 @@ namespace panim {
         return Status::success();
     }
 
-    Status RenderSession::render_frames(FrameSink &sink,
-                                        double start_time,
-                                        int frame_count) {
+    Status RenderSession::render_frames(FrameSink &sink, double start_time, int frame_count) {
         if (frame_count <= 0)
             return Status::failure("Frame count must be positive");
 

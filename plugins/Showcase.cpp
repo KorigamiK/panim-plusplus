@@ -1,12 +1,10 @@
 #include <algorithm>
 #include <cmath>
-#include <utility>
 
 #include "panim/Animation.hpp"
 #include "panim/Compute.hpp"
 #include "panim/EquationMorph.hpp"
 #include "panim/Frame.hpp"
-#include "panim/LatexRenderer.hpp"
 #include "panim/LatexTrack.hpp"
 #include "panim/Log.hpp"
 #include "panim/Painter.hpp"
@@ -40,9 +38,7 @@ namespace {
 
     class Showcase : public panim::Animation {
     public:
-        panim::AnimationInfo info() const override {
-            return {"Showcase", 10.0, 1280, 720, 30.0};
-        }
+        panim::AnimationInfo info() const override { return {"Showcase", 10.0, 1280, 720, 30.0}; }
 
         void on_setup(const AnimationContext &ctx) override {
             ctx_ = ctx;
@@ -97,12 +93,7 @@ namespace {
             // Optional LaTeX elements.
             latex_ready_ = ctx.latex != nullptr;
             if (latex_ready_) {
-                auto st = morph_.init(
-                    "e^{i\\pi}+1=0",
-                    "e^{i\\pi}=-1",
-                    *ctx.latex,
-                    1.0,
-                    static_cast<int>(ctx.height * 0.12));
+                auto st = morph_.init("e^{i\\pi}+1=0", "e^{i\\pi}=-1", *ctx.latex, 1.0, static_cast<int>(ctx.height * 0.12));
                 if (!st.ok) {
                     PANIM_LOG_WARN("Showcase: morph init failed: {}", st.message);
                     latex_ready_ = false;
@@ -112,10 +103,10 @@ namespace {
 
                 caption_.set_center_norm(0.5, 0.14);
                 caption_.set_target_height_ratio(0.05);
-                caption_.add_keyframe("\\text{Hardware accel when available}", 1.4, 0.6);
-                caption_.add_keyframe("\\text{Timeline-driven blobs}", 1.4, 0.6);
-                caption_.add_keyframe("\\text{LaTeX overlays (optional)}", 1.4, 0.6);
-                caption_.add_keyframe("\\text{Replace me with your scene}", 1.4, 0.6);
+                caption_.add_keyframe("\\text{Hardware accel when available}", 1.4, 0.6, 1.0);
+                caption_.add_keyframe("\\text{Timeline-driven blobs}", 1.4, 0.6, 0.82);
+                caption_.add_keyframe("\\text{LaTeX overlays (optional)}", 1.4, 0.6, 1.08);
+                caption_.add_keyframe("\\text{Replace me with your scene}", 1.4, 0.6, 0.92);
                 auto st2 = caption_.prepare(*ctx.latex, ctx.height);
                 if (!st2.ok) {
                     PANIM_LOG_WARN("Showcase: caption prep failed: {}", st2.message);
@@ -212,12 +203,9 @@ namespace {
             float opacity = static_cast<float>(0.55 + 0.25 * std::sin(t * 1.3));
             Frame temp = badge_;
             panim::ComputeParams params;
-            auto result = panim::apply_compute_effect(
-                temp, panim::ComputeEffect::Invert, params);
+            auto result = panim::apply_compute_effect(temp, panim::ComputeEffect::Invert, params);
             if (result.ok && !compute_logged_) {
-                PANIM_LOG_INFO(
-                    "Showcase: {} invert active on badge overlay",
-                    panim::compute_backend_name(result.backend));
+                PANIM_LOG_INFO("Showcase: {} invert active on badge overlay", panim::compute_backend_name(result.backend));
                 compute_logged_ = true;
             }
             Painter p(frame);

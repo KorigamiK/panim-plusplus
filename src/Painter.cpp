@@ -18,9 +18,7 @@ namespace panim {
         }
     } // namespace
 
-    void Painter::clear(Color c) {
-        frame_.clear(c.r, c.g, c.b, c.a);
-    }
+    void Painter::clear(Color c) { frame_.clear(c.r, c.g, c.b, c.a); }
 
     void Painter::fill_rect(int x, int y, int w, int h, Color c, float alpha) {
         if (w <= 0 || h <= 0 || alpha <= 0.0f)
@@ -71,8 +69,7 @@ namespace panim {
                 double dx = static_cast<double>(x - cx);
                 double dy = static_cast<double>(y - cy);
                 double distance = std::sqrt(dx * dx + dy * dy);
-                float coverage = static_cast<float>(
-                    std::clamp(radius + 0.5 - distance, 0.0, 1.0));
+                float coverage = static_cast<float>(std::clamp(radius + 0.5 - distance, 0.0, 1.0));
                 if (coverage > 0.0f) {
                     uint8_t *p = frame_.pixel_ptr(x, y);
                     blend_pixel(p, c, alpha * coverage);
@@ -112,8 +109,7 @@ namespace panim {
                 double dx = x - closest_x;
                 double dy = y - closest_y;
                 double distance = std::sqrt(dx * dx + dy * dy);
-                float coverage = static_cast<float>(
-                    std::clamp(half_width + 0.5 - distance, 0.0, 1.0));
+                float coverage = static_cast<float>(std::clamp(half_width + 0.5 - distance, 0.0, 1.0));
                 if (coverage > 0.0f) {
                     blend_pixel(frame_.pixel_ptr(x, y), c, alpha * coverage);
                 }
@@ -140,14 +136,8 @@ namespace panim {
         }
     }
 
-    void Painter::blit_scaled(const Frame &src,
-                              int dst_x,
-                              int dst_y,
-                              int dst_width,
-                              int dst_height,
-                              float opacity) {
-        if (src.width <= 0 || src.height <= 0 ||
-            dst_width <= 0 || dst_height <= 0 || opacity <= 0.0f) {
+    void Painter::blit_scaled(const Frame &src, int dst_x, int dst_y, int dst_width, int dst_height, float opacity) {
+        if (src.width <= 0 || src.height <= 0 || dst_width <= 0 || dst_height <= 0 || opacity <= 0.0f) {
             return;
         }
 
@@ -156,22 +146,14 @@ namespace panim {
         int x_end = std::min(frame_.width, dst_x + dst_width);
         int y_end = std::min(frame_.height, dst_y + dst_height);
         for (int y = y_begin; y < y_end; ++y) {
-            double source_y = ((y - dst_y) + 0.5) * src.height /
-                                  static_cast<double>(dst_height) -
-                              0.5;
-            int y0 = std::clamp(static_cast<int>(std::floor(source_y)),
-                                0,
-                                src.height - 1);
+            double source_y = ((y - dst_y) + 0.5) * src.height / static_cast<double>(dst_height) - 0.5;
+            int y0 = std::clamp(static_cast<int>(std::floor(source_y)), 0, src.height - 1);
             int y1 = std::min(y0 + 1, src.height - 1);
             double fy = std::clamp(source_y - std::floor(source_y), 0.0, 1.0);
 
             for (int x = x_begin; x < x_end; ++x) {
-                double source_x = ((x - dst_x) + 0.5) * src.width /
-                                      static_cast<double>(dst_width) -
-                                  0.5;
-                int x0 = std::clamp(static_cast<int>(std::floor(source_x)),
-                                    0,
-                                    src.width - 1);
+                double source_x = ((x - dst_x) + 0.5) * src.width / static_cast<double>(dst_width) - 0.5;
+                int x0 = std::clamp(static_cast<int>(std::floor(source_x)), 0, src.width - 1);
                 int x1 = std::min(x0 + 1, src.width - 1);
                 double fx = std::clamp(source_x - std::floor(source_x), 0.0, 1.0);
 
@@ -182,12 +164,9 @@ namespace panim {
                 Color sample;
                 uint8_t *channels[] = {&sample.r, &sample.g, &sample.b, &sample.a};
                 for (int channel = 0; channel < 4; ++channel) {
-                    double top = p00[channel] +
-                                 (p10[channel] - p00[channel]) * fx;
-                    double bottom = p01[channel] +
-                                    (p11[channel] - p01[channel]) * fx;
-                    *channels[channel] = static_cast<uint8_t>(std::lround(
-                        top + (bottom - top) * fy));
+                    double top = p00[channel] + (p10[channel] - p00[channel]) * fx;
+                    double bottom = p01[channel] + (p11[channel] - p01[channel]) * fx;
+                    *channels[channel] = static_cast<uint8_t>(std::lround(top + (bottom - top) * fy));
                 }
                 blend_pixel(frame_.pixel_ptr(x, y), sample, opacity);
             }

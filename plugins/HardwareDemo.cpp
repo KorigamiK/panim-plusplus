@@ -46,39 +46,26 @@ namespace {
 
     class HardwareDemo : public panim::Animation {
     public:
-        panim::AnimationInfo info() const override {
-            return {"HardwareDemo", 4.0, 1280, 720, 30.0};
-        }
+        panim::AnimationInfo info() const override { return {"HardwareDemo", 4.0, 1280, 720, 30.0}; }
 
         void on_setup(const panim::AnimationContext &ctx) override {
             ctx_ = ctx;
             device_ = panim::compute_device();
             accent_ = backend_color(device_.backend);
-            PANIM_LOG_INFO("HardwareDemo selected {} on {}",
-                           device_.backend_name,
-                           device_.device_name);
+            PANIM_LOG_INFO("HardwareDemo selected {} on {}", device_.backend_name, device_.device_name);
 
             if (ctx.latex) {
                 title_.set_center_norm(0.5, 0.10);
                 title_.set_target_height_ratio(0.065);
-                title_.add_keyframe("\\text{panim heterogeneous compute}",
-                                    60.0,
-                                    0.0);
+                title_.add_keyframe("\\text{panim heterogeneous compute}", 60.0, 0.0);
 
                 backend_.set_center_norm(0.5, 0.19);
                 backend_.set_target_height_ratio(0.038);
-                backend_.add_keyframe(
-                    latex_text("Auto-selected: " + device_.device_name +
-                               " via " + device_.backend_name),
-                    60.0,
-                    0.0);
+                backend_.add_keyframe(latex_text("Auto-selected: " + device_.device_name + " via " + device_.backend_name), 60.0, 0.0);
 
                 footer_.set_center_norm(0.5, 0.91);
                 footer_.set_target_height_ratio(0.033);
-                footer_.add_keyframe(
-                    "\\text{One WGSL kernel / WebGPU / CPU}",
-                    60.0,
-                    0.0);
+                footer_.add_keyframe("\\text{One WGSL kernel / WebGPU / CPU}", 60.0, 0.0);
 
                 title_ready_ = title_.prepare(*ctx.latex, ctx.height).ok;
                 backend_ready_ = backend_.prepare(*ctx.latex, ctx.height).ok;
@@ -90,32 +77,19 @@ namespace {
             panim::ComputeParams params;
             params.time_seconds = static_cast<float>(time_sec);
             params.strength = 1.0f;
-            panim::ComputeResult result = panim::apply_compute_effect(
-                frame, panim::ComputeEffect::AnimatedGradient, params);
+            panim::ComputeResult result = panim::apply_compute_effect(frame, panim::ComputeEffect::AnimatedGradient, params);
             if (!result_logged_) {
                 if (result.ok) {
-                    PANIM_LOG_INFO("HardwareDemo frames executing on {}",
-                                   panim::compute_backend_name(result.backend));
+                    PANIM_LOG_INFO("HardwareDemo frames executing on {}", panim::compute_backend_name(result.backend));
                 } else {
-                    PANIM_LOG_ERROR("HardwareDemo compute failed: {}",
-                                    result.message);
+                    PANIM_LOG_ERROR("HardwareDemo compute failed: {}", result.message);
                 }
                 result_logged_ = true;
             }
 
             panim::Painter painter(frame);
-            painter.fill_rect(0,
-                              0,
-                              ctx_.width,
-                              static_cast<int>(ctx_.height * 0.25),
-                              {4, 8, 24, 255},
-                              0.58f);
-            painter.fill_rect(0,
-                              static_cast<int>(ctx_.height * 0.84),
-                              ctx_.width,
-                              static_cast<int>(ctx_.height * 0.16),
-                              {4, 8, 24, 255},
-                              0.48f);
+            painter.fill_rect(0, 0, ctx_.width, static_cast<int>(ctx_.height * 0.25), {4, 8, 24, 255}, 0.58f);
+            painter.fill_rect(0, static_cast<int>(ctx_.height * 0.84), ctx_.width, static_cast<int>(ctx_.height * 0.16), {4, 8, 24, 255}, 0.48f);
 
             draw_compute_graph(frame, time_sec);
             draw_activity_meter(frame, time_sec);
@@ -160,64 +134,24 @@ namespace {
             };
 
             for (const Node &node : nodes) {
-                painter.stroke_line(center_x,
-                                    center_y,
-                                    node.x,
-                                    node.y,
-                                    4,
-                                    accent_,
-                                    0.25f);
-                painter.stroke_line(center_x,
-                                    center_y,
-                                    node.x,
-                                    node.y,
-                                    1,
-                                    {255, 255, 255, 255},
-                                    0.45f);
+                painter.stroke_line(center_x, center_y, node.x, node.y, 4, accent_, 0.25f);
+                painter.stroke_line(center_x, center_y, node.x, node.y, 1, {255, 255, 255, 255}, 0.45f);
             }
 
-            int pulse_radius = node_radius + static_cast<int>(
-                                                 node_radius * 0.18 *
-                                                 std::sin(time_sec * 2.4));
-            painter.fill_circle(center_x,
-                                center_y,
-                                pulse_radius + 18,
-                                accent_,
-                                0.16f);
-            painter.fill_circle(center_x,
-                                center_y,
-                                pulse_radius,
-                                {8, 14, 32, 255},
-                                0.88f);
-            painter.fill_circle(center_x,
-                                center_y,
-                                std::max(5, pulse_radius / 3),
-                                accent_,
-                                0.92f);
+            int pulse_radius = node_radius + static_cast<int>(node_radius * 0.18 * std::sin(time_sec * 2.4));
+            painter.fill_circle(center_x, center_y, pulse_radius + 18, accent_, 0.16f);
+            painter.fill_circle(center_x, center_y, pulse_radius, {8, 14, 32, 255}, 0.88f);
+            painter.fill_circle(center_x, center_y, std::max(5, pulse_radius / 3), accent_, 0.92f);
 
             for (size_t i = 0; i < std::size(nodes); ++i) {
                 const Node &node = nodes[i];
-                painter.fill_circle(node.x,
-                                    node.y,
-                                    node_radius + 9,
-                                    {8, 14, 32, 255},
-                                    0.48f);
-                painter.fill_circle(node.x,
-                                    node.y,
-                                    node_radius,
-                                    accent_,
-                                    0.76f);
+                painter.fill_circle(node.x, node.y, node_radius + 9, {8, 14, 32, 255}, 0.48f);
+                painter.fill_circle(node.x, node.y, node_radius, accent_, 0.76f);
 
                 double progress = std::fmod(time_sec * 0.62 + i * 0.23, 1.0);
-                int packet_x = static_cast<int>(
-                    node.x + (center_x - node.x) * progress);
-                int packet_y = static_cast<int>(
-                    node.y + (center_y - node.y) * progress);
-                painter.fill_circle(packet_x,
-                                    packet_y,
-                                    std::max(4, node_radius / 7),
-                                    {255, 255, 255, 255},
-                                    0.95f);
+                int packet_x = static_cast<int>(node.x + (center_x - node.x) * progress);
+                int packet_y = static_cast<int>(node.y + (center_y - node.y) * progress);
+                painter.fill_circle(packet_x, packet_y, std::max(4, node_radius / 7), {255, 255, 255, 255}, 0.95f);
             }
         }
 
@@ -234,12 +168,7 @@ namespace {
                 double phase = time_sec * 2.1 + i * 0.47;
                 double activity = 0.2 + 0.8 * (0.5 + 0.5 * std::sin(phase));
                 int height = static_cast<int>(max_height * activity);
-                painter.fill_rect(start_x + i * (bar_width + gap),
-                                  baseline - height,
-                                  bar_width,
-                                  height,
-                                  accent_,
-                                  0.62f);
+                painter.fill_rect(start_x + i * (bar_width + gap), baseline - height, bar_width, height, accent_, 0.62f);
             }
         }
     };

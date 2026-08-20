@@ -34,18 +34,13 @@ namespace {
 
     class SampleWave : public Animation {
     public:
-        AnimationInfo info() const override {
-            return {"SampleWave", 6.0, 1280, 720, 30.0};
-        }
+        AnimationInfo info() const override { return {"SampleWave", 6.0, 1280, 720, 30.0}; }
 
         void on_setup(const AnimationContext &ctx) override {
             ctx_ = ctx;
             if (ctx.latex) {
-                morph_.init("\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}",
-                            "\\frac{1}{\\sqrt{\\pi}} e^{-x^2} \\longrightarrow 1",
-                            *ctx.latex,
-                            1.0,
-                            static_cast<int>(ctx.height * 0.15));
+                morph_.init("\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}", "\\frac{1}{\\sqrt{\\pi}} e^{-x^2} \\longrightarrow 1",
+                            *ctx.latex, 1.0, static_cast<int>(ctx.height * 0.15));
                 morph_.set_center_norm(0.5, 0.6); // near center
             }
         }
@@ -81,11 +76,9 @@ namespace {
             auto result = apply_compute_effect(frame, ComputeEffect::Invert, params);
             if (!compute_reported_) {
                 if (result.ok) {
-                    PANIM_LOG_INFO("{} invert applied",
-                                   compute_backend_name(result.backend));
+                    PANIM_LOG_INFO("{} invert applied", compute_backend_name(result.backend));
                 } else {
-                    PANIM_LOG_WARN("Compute invert unavailable: {}",
-                                   result.message);
+                    PANIM_LOG_WARN("Compute invert unavailable: {}", result.message);
                 }
                 compute_reported_ = true;
             }
