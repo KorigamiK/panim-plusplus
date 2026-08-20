@@ -9,9 +9,9 @@ The project uses **CMake** (3.18+) and C++20.
 - **Build Type**: Defaults to `Release`.
 - **CPU Acceleration**: Enabled by default (`-march=native`).
 - **FFmpeg**: Required for video output via `pkg-config`.
-- **GPU Compute**: One WGSL implementation runs through wgpu-native. Set
-  `PANIM_WGPU_ROOT` when it is not installed in a default prefix. Adapter and
-  native-API selection are automatic; environment overrides are diagnostic.
+- **GPU Compute**: One required WGSL implementation runs through wgpu-native.
+  Add non-standard installations to `CMAKE_PREFIX_PATH`. CPU compute is not
+  supported.
 - **Exceptions**: Disabled globally (`-fno-exceptions`).
 
 ### Prerequisites (Debian/Ubuntu)

@@ -21,14 +21,11 @@ namespace panim {
 
     class RenderSession {
     public:
-        RenderSession(Animation &animation,
-                      const RenderSessionOptions &options);
+        RenderSession(Animation &animation, const RenderSessionOptions &options);
 
         Status setup();
         Status render_at(double time_seconds);
-        Status render_frames(FrameSink &sink,
-                             double start_time,
-                             int frame_count);
+        Status render_frames(FrameSink &sink, double start_time, int frame_count);
 
         const Frame &frame() const { return frame_; }
         Frame &frame() { return frame_; }

@@ -7,14 +7,7 @@
 #define PANIM_PLUGIN_EXPORT __attribute__((visibility("default")))
 #endif
 
-#define PANIM_EXPORT_ANIMATION(AnimationType)                             \
-    extern "C" PANIM_PLUGIN_EXPORT uint32_t panim_plugin_api_version() {  \
-        return panim::plugin_api_version;                                 \
-    }                                                                     \
-    extern "C" PANIM_PLUGIN_EXPORT panim::Animation *create_animation() { \
-        return new AnimationType();                                       \
-    }                                                                     \
-    extern "C" PANIM_PLUGIN_EXPORT void destroy_animation(                \
-        panim::Animation *animation) {                                    \
-        delete animation;                                                 \
-    }
+#define PANIM_EXPORT_ANIMATION(AnimationType)                                                                                                        \
+    extern "C" PANIM_PLUGIN_EXPORT uint32_t panim_plugin_api_version() { return panim::plugin_api_version; }                                         \
+    extern "C" PANIM_PLUGIN_EXPORT panim::Animation *create_animation() { return new AnimationType(); }                                              \
+    extern "C" PANIM_PLUGIN_EXPORT void destroy_animation(panim::Animation *animation) { delete animation; }

@@ -29,10 +29,7 @@ namespace panim {
     public:
         using RenderFn = std::function<void(Frame &, const SceneTime &)>;
 
-        SceneSequence &add(std::string name,
-                           double duration,
-                           RenderFn render,
-                           double transition = 0.65);
+        SceneSequence &add(std::string name, double duration, RenderFn render, double transition = 0.65);
 
         void set_looping(bool looping) { looping_ = looping; }
         bool looping() const { return looping_; }

@@ -16,12 +16,7 @@ namespace panim {
         void fill_circle(int cx, int cy, int radius, Color c, float alpha = 1.0f);
         void stroke_line(int x0, int y0, int x1, int y1, int thickness, Color c, float alpha = 1.0f);
         void blit(const Frame &src, int dst_x, int dst_y, float opacity = 1.0f);
-        void blit_scaled(const Frame &src,
-                         int dst_x,
-                         int dst_y,
-                         int dst_width,
-                         int dst_height,
-                         float opacity = 1.0f);
+        void blit_scaled(const Frame &src, int dst_x, int dst_y, int dst_width, int dst_height, float opacity = 1.0f);
 
     private:
         Frame &frame_;

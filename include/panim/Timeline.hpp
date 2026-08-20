@@ -12,9 +12,7 @@ namespace panim::anim {
 
     using EaseFn = double (*)(double);
 
-    inline double ease_linear(double t) {
-        return t;
-    }
+    inline double ease_linear(double t) { return t; }
 
     inline double ease_smootherstep(double t) {
         // Quintic smoothstep: 6t^5 - 15t^4 + 10t^3
@@ -34,63 +32,45 @@ namespace panim::anim {
         return 1.0 + c3 * std::pow(u - 1.0, 3) + c1 * std::pow(u - 1.0, 2);
     }
 
-    template <typename T>
-    struct LerpHelper {
+    template <typename T> struct LerpHelper {
         static T apply(const T &, const T &, double) {
             static_assert(!sizeof(T), "LerpHelper specialization missing for type T");
             return T{};
         }
     };
 
-    template <typename T>
-    struct LerpHelperArithmetic {
+    template <typename T> struct LerpHelperArithmetic {
         static T apply(const T &a, const T &b, double t) {
             double u = std::clamp(t, 0.0, 1.0);
             return static_cast<T>(a + (b - a) * u);
         }
     };
 
-    template <>
-    struct LerpHelper<double> : LerpHelperArithmetic<double> {};
-    template <>
-    struct LerpHelper<float> : LerpHelperArithmetic<float> {};
-    template <>
-    struct LerpHelper<int> : LerpHelperArithmetic<int> {};
+    template <> struct LerpHelper<double> : LerpHelperArithmetic<double> {};
+    template <> struct LerpHelper<float> : LerpHelperArithmetic<float> {};
+    template <> struct LerpHelper<int> : LerpHelperArithmetic<int> {};
 
-    template <>
-    struct LerpHelper<panim::Vec2> {
-        static panim::Vec2 apply(const panim::Vec2 &a, const panim::Vec2 &b, double t) {
-            return panim::lerp_vec2(a, b, t);
-        }
+    template <> struct LerpHelper<panim::Vec2> {
+        static panim::Vec2 apply(const panim::Vec2 &a, const panim::Vec2 &b, double t) { return panim::lerp_vec2(a, b, t); }
     };
 
-    template <>
-    struct LerpHelper<panim::Color> {
-        static panim::Color apply(const panim::Color &a, const panim::Color &b, double t) {
-            return panim::lerp_color(a, b, t);
-        }
+    template <> struct LerpHelper<panim::Color> {
+        static panim::Color apply(const panim::Color &a, const panim::Color &b, double t) { return panim::lerp_color(a, b, t); }
     };
 
-    template <typename T>
-    inline T lerp_value(const T &a, const T &b, double t) {
-        return LerpHelper<T>::apply(a, b, t);
-    }
+    template <typename T> inline T lerp_value(const T &a, const T &b, double t) { return LerpHelper<T>::apply(a, b, t); }
 
-    template <typename T>
-    struct Keyframe {
+    template <typename T> struct Keyframe {
         double time = 0.0;
         T value{};
         EaseFn ease = ease_smootherstep;
     };
 
-    template <typename T>
-    class Track {
+    template <typename T> class Track {
     public:
         void add(double time, const T &value, EaseFn ease = ease_smootherstep) {
             keys_.push_back({time, value, ease});
-            std::sort(keys_.begin(), keys_.end(), [](const Keyframe<T> &a, const Keyframe<T> &b) {
-                return a.time < b.time;
-            });
+            std::sort(keys_.begin(), keys_.end(), [](const Keyframe<T> &a, const Keyframe<T> &b) { return a.time < b.time; });
         }
 
         bool empty() const { return keys_.empty(); }
@@ -113,8 +93,7 @@ namespace panim::anim {
                 return keys_.back().value;
             }
 
-            auto it = std::upper_bound(keys_.begin(), keys_.end(), t,
-                                       [](double needle, const Keyframe<T> &k) { return needle < k.time; });
+            auto it = std::upper_bound(keys_.begin(), keys_.end(), t, [](double needle, const Keyframe<T> &k) { return needle < k.time; });
             const Keyframe<T> &b = *it;
             const Keyframe<T> &a = *(it - 1);
             double u = (t - a.time) / (b.time - a.time);
@@ -141,4 +120,3 @@ namespace panim::anim {
     };
 
 } // namespace panim::anim
-

@@ -1,8 +1,8 @@
 #include "panim/Animation.hpp"
 #include "panim/Frame.hpp"
-#include "panim/LatexRenderer.hpp"
 #include "panim/LatexTrack.hpp"
 #include "panim/Log.hpp"
+#include "panim/Painter.hpp"
 #include "panim/Plugin.hpp"
 #include <cmath>
 
@@ -43,7 +43,7 @@ namespace {
             // Secondary overlay for captions; tinted blue.
             side_.set_center_norm(0.5, 0.18);
             side_.set_target_height_ratio(0.12);
-            side_.set_tint(90, 150, 255);
+            side_.set_tint(0xFD, 0xDA, 0x86);
             side_.add_keyframe("\\text{Tree growth table}", 1.2, 0.4);
             side_.add_keyframe("\\text{Isolate variables}", 1.2, 0.4);
             side_.add_keyframe("\\text{Square both sides}", 1.2, 0.4);
@@ -60,17 +60,8 @@ namespace {
 
         void render_frame(Frame &frame, double t) override {
             // gradient background
-            for (int y = 0; y < frame.height; ++y) {
-                double ny = static_cast<double>(y) / frame.height;
-                for (int x = 0; x < frame.width; ++x) {
-                    double nx = static_cast<double>(x) / frame.width;
-                    double c = 0.5 + 0.5 * std::sin(nx * 2.4 + ny * 1.7 + t * 0.2);
-                    uint8_t r = static_cast<uint8_t>(30 + 150 * c);
-                    uint8_t g = static_cast<uint8_t>(70 + 100 * (1.0 - c));
-                    uint8_t b = static_cast<uint8_t>(170 + 70 * (1.0 - c));
-                    frame.set_pixel(x, y, r, g, b, 255);
-                }
-            }
+            Painter paint(frame);
+            paint.fill_vertical_gradient((Color)0x281F1F, (Color)0x0E9A0C);
             if (main_.ready()) {
                 double tt = std::fmod(t, main_.duration());
                 main_.render(frame, tt);

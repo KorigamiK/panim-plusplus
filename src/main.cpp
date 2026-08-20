@@ -10,6 +10,7 @@
 #include <string_view>
 #include <vector>
 
+#include "Preview.hpp"
 #include "panim/Animation.hpp"
 #include "panim/Frame.hpp"
 #include "panim/FrameSink.hpp"
@@ -18,10 +19,6 @@
 #include "panim/PluginHost.hpp"
 #include "panim/RenderSession.hpp"
 #include "panim/Status.hpp"
-
-#ifdef PANIM_HAVE_PREVIEW
-#include "Preview.hpp"
-#endif
 
 namespace {
 
@@ -410,7 +407,6 @@ int main(int argc, char **argv) {
                             "preview resolution");
             return 2;
         }
-#ifdef PANIM_HAVE_PREVIEW
         panim::PreviewOptions preview_options;
         preview_options.plugin_path = plugin_path;
         preview_options.output_dir = args.output.value_or("panim_out");
@@ -427,11 +423,6 @@ int main(int argc, char **argv) {
             return 1;
         }
         return 0;
-#else
-        PANIM_LOG_ERROR("Interactive preview was not built. Install SDL3 and wgpu-native, "
-                        "then configure with -DPANIM_BUILD_PREVIEW=ON.");
-        return 1;
-#endif
     }
 
     panim::PluginHost host(plugin_path);
@@ -519,7 +510,6 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-#ifdef PANIM_ENABLE_FFMPEG
     panim::VideoWriterOptions writer_options;
     writer_options.profile = args.quality;
     writer_options.input_width = render_width;
@@ -536,11 +526,6 @@ int main(int argc, char **argv) {
         return 1;
     }
     PANIM_LOG_INFO("Rendered {} to {}", still_output ? "image" : "video", output.string());
-#else
-    PANIM_LOG_ERROR("FFmpeg disabled at build time; rebuild with "
-                    "-DPANIM_ENABLE_FFMPEG=ON to emit video.");
-    return 1;
-#endif
 
     return 0;
 }

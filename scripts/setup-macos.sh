@@ -19,7 +19,7 @@ microtex_root="${MICROTEX_ROOT:-${dependency_root}/MicroTeX}"
 microtex_ref="0e3707f6dafebb121d98b53c64364d16fefe481d"
 microtex_patch="${repo_root}/patches/MicroTeX-macos.patch"
 wgpu_version="v29.0.1.1"
-wgpu_root="${PANIM_WGPU_ROOT:-${dependency_root}/wgpu-native-${wgpu_version}}"
+wgpu_root="${dependency_root}/wgpu-native-${wgpu_version}"
 
 case "$(uname -m)" in
 arm64)
@@ -149,7 +149,7 @@ cmake \
     -B "${repo_root}/build" \
     -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
-    -DPANIM_WGPU_ROOT="${wgpu_root}"
+    -DCMAKE_PREFIX_PATH="${wgpu_root};${brew_prefix}"
 cmake --build "${repo_root}/build" --parallel
 ctest --test-dir "${repo_root}/build" --output-on-failure
 

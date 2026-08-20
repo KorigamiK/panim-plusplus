@@ -218,43 +218,6 @@ namespace panim {
             }
         }
 
-        bool crop_to_alpha(Frame &frame, int &offset_x, int &offset_y) {
-            int min_x = frame.width;
-            int min_y = frame.height;
-            int max_x = -1;
-            int max_y = -1;
-            for (int y = 0; y < frame.height; ++y) {
-                for (int x = 0; x < frame.width; ++x) {
-                    const uint8_t *pixel = frame.pixel_ptr(x, y);
-                    if (pixel[3] == 0)
-                        continue;
-                    min_x = std::min(min_x, x);
-                    min_y = std::min(min_y, y);
-                    max_x = std::max(max_x, x);
-                    max_y = std::max(max_y, y);
-                }
-            }
-            if (max_x < min_x || max_y < min_y)
-                return false;
-
-            offset_x = min_x;
-            offset_y = min_y;
-            Frame cropped(max_x - min_x + 1, max_y - min_y + 1);
-            cropped.clear(0, 0, 0, 0);
-            for (int y = 0; y < cropped.height; ++y) {
-                for (int x = 0; x < cropped.width; ++x) {
-                    const uint8_t *source = frame.pixel_ptr(min_x + x, min_y + y);
-                    uint8_t *target = cropped.pixel_ptr(x, y);
-                    target[0] = source[0];
-                    target[1] = source[1];
-                    target[2] = source[2];
-                    target[3] = source[3];
-                }
-            }
-            frame = std::move(cropped);
-            return true;
-        }
-
         void alpha_over_scaled(const Frame &src, Frame &dst, int x0, int y0, int output_width, int output_height, double opacity, bool tint_set,
                                uint8_t tint_r, uint8_t tint_g, uint8_t tint_b) {
             if (opacity <= 0.0 || output_width <= 0 || output_height <= 0 || src.width <= 0 || src.height <= 0) {
@@ -445,14 +408,12 @@ namespace panim {
         if (!text_transition && parse_microtex_layout(svg_from, from_layout) && parse_microtex_layout(svg_to, to_layout)) {
             bool layers_ok = true;
             for (const ParsedLayer &parsed : from_layout.layers) {
-                Frame frame(1, 1);
-                if (!rasterize_svg_data(parsed.svg_markup, frame, from_scale)) {
-                    layers_ok = false;
-                    break;
-                }
                 GlyphLayer layer;
-                layer.frame = std::move(frame);
-                if (!crop_to_alpha(layer.frame, layer.offset_x, layer.offset_y)) {
+                if (!rasterize_svg_data_cropped(parsed.svg_markup,
+                                                layer.frame,
+                                                layer.offset_x,
+                                                layer.offset_y,
+                                                from_scale)) {
                     layers_ok = false;
                     break;
                 }
@@ -460,14 +421,12 @@ namespace panim {
             }
             if (layers_ok) {
                 for (const ParsedLayer &parsed : to_layout.layers) {
-                    Frame frame(1, 1);
-                    if (!rasterize_svg_data(parsed.svg_markup, frame, to_scale)) {
-                        layers_ok = false;
-                        break;
-                    }
                     GlyphLayer layer;
-                    layer.frame = std::move(frame);
-                    if (!crop_to_alpha(layer.frame, layer.offset_x, layer.offset_y)) {
+                    if (!rasterize_svg_data_cropped(parsed.svg_markup,
+                                                    layer.frame,
+                                                    layer.offset_x,
+                                                    layer.offset_y,
+                                                    to_scale)) {
                         layers_ok = false;
                         break;
                     }

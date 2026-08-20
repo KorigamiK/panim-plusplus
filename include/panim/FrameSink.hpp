@@ -14,27 +14,19 @@ namespace panim {
     public:
         virtual ~FrameSink() = default;
 
-        virtual Status submit(const Frame &frame,
-                              int frame_index,
-                              double time_seconds) = 0;
+        virtual Status submit(const Frame &frame, int frame_index, double time_seconds) = 0;
         virtual Status finish() = 0;
     };
 
     class VideoFrameSink final : public FrameSink {
     public:
-        VideoFrameSink(const std::filesystem::path &path,
-                       int output_width,
-                       int output_height,
-                       double fps,
-                       const VideoWriterOptions &options = {});
+        VideoFrameSink(const std::filesystem::path &path, int output_width, int output_height, double fps, const VideoWriterOptions &options = {});
         ~VideoFrameSink() override;
 
         VideoFrameSink(const VideoFrameSink &) = delete;
         VideoFrameSink &operator=(const VideoFrameSink &) = delete;
 
-        Status submit(const Frame &frame,
-                      int frame_index,
-                      double time_seconds) override;
+        Status submit(const Frame &frame, int frame_index, double time_seconds) override;
         Status finish() override;
         const Status &status() const { return status_; }
         bool ok() const { return status_.ok; }

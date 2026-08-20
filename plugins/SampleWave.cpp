@@ -76,7 +76,7 @@ namespace {
             auto result = apply_compute_effect(frame, ComputeEffect::Invert, params);
             if (!compute_reported_) {
                 if (result.ok) {
-                    PANIM_LOG_INFO("{} invert applied", compute_backend_name(result.backend));
+                    PANIM_LOG_INFO("WebGPU invert applied");
                 } else {
                     PANIM_LOG_WARN("Compute invert unavailable: {}", result.message);
                 }

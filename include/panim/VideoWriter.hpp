@@ -29,16 +29,8 @@ namespace panim {
     class VideoWriter {
     public:
         // A non-positive bitrate selects quality-based H.264 encoding.
-        VideoWriter(const std::filesystem::path &path,
-                    int width,
-                    int height,
-                    double fps,
-                    int bitrate = 0);
-        VideoWriter(const std::filesystem::path &path,
-                    int width,
-                    int height,
-                    double fps,
-                    const VideoWriterOptions &options);
+        VideoWriter(const std::filesystem::path &path, int width, int height, double fps, int bitrate = 0);
+        VideoWriter(const std::filesystem::path &path, int width, int height, double fps, const VideoWriterOptions &options);
         ~VideoWriter();
 
         VideoWriter(const VideoWriter &) = delete;

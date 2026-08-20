@@ -3,8 +3,8 @@
 `panim++` is a C++20, plugin-driven animation engine inspired by
 [swaptube](https://github.com/2swap/swaptube) and
 [tsoding/panim](https://github.com/tsoding/panim). Animations are compiled as
-shared libraries and loaded at runtime. Frames can be processed through a
-portable CPU path or one WGSL compute path running through WebGPU, then encoded
+shared libraries and loaded at runtime. Frames are processed by a WGSL compute
+path running through WebGPU, then encoded
 to video through the system FFmpeg libraries. Interactive iteration uses a
 native SDL3 window presented by the same WebGPU implementation, so FFmpeg is
 reserved for final files rather than used as a preview player.
@@ -28,15 +28,14 @@ The script:
 - installs MicroTeX's resources under the per-user data directory it already
   supports;
 - downloads the pinned, checksum-verified wgpu-native binary beside the
-  repository when `PANIM_WGPU_ROOT` is not already set;
+  repository;
 - configures and builds panim++ with WebGPU over the system Metal framework; and
 - runs the lightweight core tests; and
 - renders `panim_out/setup-smoke.mp4`, `panim_out/hardware-smoke.mp4`, and
   `panim_out/feature-smoke.mp4` as end-to-end checks.
 
 Set `PANIM_DEPS_DIR` to choose another parent directory for external
-dependencies. Set `MICROTEX_ROOT` or `PANIM_WGPU_ROOT` to use existing
-installations:
+dependencies. Set `MICROTEX_ROOT` to use an existing MicroTeX installation:
 
 ```bash
 PANIM_DEPS_DIR="$HOME/Developer/deps" ./scripts/setup-macos.sh
@@ -55,31 +54,13 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 ```
 
-Important options:
+The build has no feature switches. FFmpeg, librsvg, Cairo, tinyxml2, spdlog,
+SDL3, and wgpu-native are required. CMake discovers system packages normally;
+add a non-standard wgpu-native installation to `CMAKE_PREFIX_PATH`.
 
-- `PANIM_ENABLE_HWACCEL=ON` adds `-march=native` and `-mtune=native` when the
-  compiler supports them. Disable it for portable release binaries.
-- `PANIM_ENABLE_FFMPEG=ON` uses `libavformat`, `libavcodec`, `libavutil`, and
-  `libswscale` from pkg-config.
-- `PANIM_ENABLE_SVG=ON` uses system librsvg, Cairo, and tinyxml2 for SVG
-  compositing and glyph-aware equation transitions.
-- `PANIM_USE_SPDLOG=ON` uses system spdlog when found and otherwise falls back
-  to stderr logging.
-- `PANIM_ENABLE_WEBGPU=ON` enables the single WGSL compute implementation when
-  an installed wgpu-native distribution can be found.
-- `PANIM_BUILD_PREVIEW=ON` builds the optional interactive preview when system
-  SDL3 and wgpu-native are available. Headless renders and `panim_core` do not
-  depend on SDL3 when this option is disabled.
-- `PANIM_WGPU_ROOT=/path/to/wgpu-native` supplies an explicit wgpu-native
-  installation. The directory must contain `include/webgpu/webgpu.h` and
-  `lib/libwgpu_native.a` or a compatible shared library.
-- `PANIM_BUILD_HARDWARE_DEMO=ON` builds a demo that exercises the selected
-  compute backend through the shared API.
-
-All bundled plugins are enabled by default. The primary build products are:
+All bundled plugins are built. The primary build products are:
 
 - `build/bin/panim`;
-- `build/plugins/libQuickStart.dylib` on macOS, or `.so` on Linux;
 - `build/plugins/libShowcase.dylib` on macOS, or `.so` on Linux;
 - `build/plugins/libSampleWave.dylib` on macOS, or `.so` on Linux; and
 - `build/plugins/libLatexDemo.dylib` on macOS, or `.so` on Linux; and
@@ -103,7 +84,7 @@ layout, builds only the CLI and `FeatureTour`, and then launches the preview.
 The normal authoring loop has three explicit commands:
 
 ```bash
-# Native WebGPU window: no video encode, automatic Metal/Vulkan/D3D12 choice.
+# Native WebGPU window: no video encode, automatic Metal/Vulkan choice.
 ./build/bin/panim preview FeatureTour
 
 # One exact, lossless timeline frame for close visual inspection.
@@ -290,23 +271,20 @@ graphics API underneath WebGPU:
 
 | Host | Typical native API | GPU vendors |
 | --- | --- | --- |
-| macOS and iOS | Metal | Apple, supported external GPUs |
-| Linux and Android | Vulkan | NVIDIA, AMD, Intel, mobile GPUs |
-| Windows | D3D12 or Vulkan | NVIDIA, AMD, Intel |
-| Any supported host | Portable fallback | CPU |
+| macOS | Metal | Apple, supported external GPUs |
+| Linux | Vulkan | NVIDIA, AMD, Intel |
 
 Use a prebuilt wgpu-native release or a system installation rather than
 vendoring it into the source tree. A manual configuration looks like:
 
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-    -DPANIM_WGPU_ROOT=/path/to/wgpu-native
+    -DCMAKE_PREFIX_PATH=/path/to/wgpu-native
 ```
 
-`PANIM_WGPU_ROOT` only tells CMake where the wgpu-native library is installed;
-it does not select hardware. `PANIM_COMPUTE_BACKEND` and `WGPU_BACKEND` are
-optional diagnostic overrides for testing the CPU fallback or a particular
-wgpu-native API. They should not appear in ordinary run commands or plugins.
+`CMAKE_PREFIX_PATH` only tells CMake where wgpu-native is installed; WebGPU
+selects the GPU and native graphics API automatically. CPU adapters are
+rejected.
 
 ```cpp
 #include "panim/Compute.hpp"
@@ -322,7 +300,7 @@ if (!result.ok) {
 }
 ```
 
-Run the same demo on the automatically selected adapter:
+Run the demo on the automatically selected GPU:
 
 ```bash
 ./build/bin/panim render HardwareDemo \
@@ -330,14 +308,6 @@ Run the same demo on the automatically selected adapter:
     --size 1920x1080 \
     --fps 60 \
     --output panim_out/hardware-demo.mp4
-
-# Diagnostic only: exercise the fallback deterministically.
-PANIM_COMPUTE_BACKEND=cpu ./build/bin/panim render \
-    HardwareDemo \
-    --duration 4 \
-    --size 1920x1080 \
-    --fps 60 \
-    --output panim_out/hardware-demo-cpu.mp4
 ```
 
 The current abstraction accepts the engine's host-resident RGBA frame, so each
@@ -355,8 +325,7 @@ The intended author-facing surface has six pieces:
 - `Track<T>` animates numbers, positions, and colors with easing.
 - `SceneSequence` gives each scene local time and crossfades scene outputs.
 - `LatexTrack` and `EquationMorph` render and morph MicroTeX glyphs.
-- `apply_compute_effect` runs built-in WGSL effects on the automatically
-  selected WebGPU adapter, with a CPU fallback.
+- `apply_compute_effect` runs built-in WGSL effects on the selected GPU.
 
 A complete plugin can stay small:
 
@@ -391,8 +360,8 @@ private:
 PANIM_EXPORT_ANIMATION(Hello)
 ```
 
-Register in-repository plugins with `panim_add_plugin` in `CMakeLists.txt`.
-See `plugins/QuickStart.cpp` for a minimal complete animation. See
+Register in-repository plugins with `add_panim_plugin` in `CMakeLists.txt`.
+See `plugins/SampleWave.cpp` for a small complete animation. See
 `plugins/FeatureTour.cpp` for scenes, animated properties, equation morphing,
 scaled compositing, and a WGSL Mandelbulb in one animation.
 
@@ -405,7 +374,7 @@ The product/API audit and prioritized next steps are in
 
 ## Install
 
-To stage the CLI, core library, public headers, and all enabled plugins:
+To stage the CLI, core library, public headers, and all plugins:
 
 ```bash
 cmake --install build --prefix dist

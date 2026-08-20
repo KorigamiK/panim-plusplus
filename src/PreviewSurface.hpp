@@ -12,9 +12,7 @@ namespace panim::detail {
         void *platform_view = nullptr;
     };
 
-    Status create_preview_surface(WGPUInstance instance,
-                                  SDL_Window *window,
-                                  PreviewSurface &result);
+    Status create_preview_surface(WGPUInstance instance, SDL_Window *window, PreviewSurface &result);
     void destroy_preview_surface(PreviewSurface &surface);
 
 } // namespace panim::detail

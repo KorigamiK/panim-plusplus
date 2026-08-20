@@ -870,19 +870,6 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4<f32> {
             return "";
         }
 
-        void update_title(SDL_Window *window, const LoadedAnimation &loaded, double time_seconds, bool playing, PreviewControl hovered_control) {
-            char title[256]{};
-            const char *hint = control_label(hovered_control);
-            if (hint[0]) {
-                std::snprintf(title, sizeof(title), "panim++ — %s — %.2f / %.2f s — %s — %s", loaded.name.c_str(), time_seconds, loaded.duration,
-                              playing ? "playing" : "paused", hint);
-            } else {
-                std::snprintf(title, sizeof(title), "panim++ — %s — %.2f / %.2f s — %s", loaded.name.c_str(), time_seconds, loaded.duration,
-                              playing ? "playing" : "paused");
-            }
-            SDL_SetWindowTitle(window, title);
-        }
-
     } // namespace
 
     Status run_preview(const PreviewOptions &options) {
@@ -922,7 +909,7 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4<f32> {
 #ifdef __APPLE__
         flags |= SDL_WINDOW_METAL;
 #endif
-        SDL_Window *window = SDL_CreateWindow("panim++ preview", window_width, window_height, flags);
+        SDL_Window *window = SDL_CreateWindow("panim++", window_width, window_height, flags);
         if (!window) {
             std::string message = SDL_GetError();
             SDL_Quit();
@@ -1160,7 +1147,6 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4<f32> {
                     running = false;
                     continue;
                 }
-                update_title(window, *loaded, time_seconds, playing, hovered_control);
                 dirty = false;
                 next_frame = now + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(1.0 / loaded->fps));
                 ++presented_frames;

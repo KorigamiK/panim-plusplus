@@ -43,8 +43,7 @@ namespace {
             ctx_ = ctx;
             device_ = panim::compute_device();
 
-            int fractal_divisor = device_.hardware_accelerated ? 1 : 4;
-            fractal_ = panim::Frame(std::max(1, ctx.width / fractal_divisor), std::max(1, ctx.height / fractal_divisor));
+            fractal_ = panim::Frame(ctx.width, ctx.height);
 
             prepare_text();
             prepare_motion();

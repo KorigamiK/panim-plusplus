@@ -358,14 +358,17 @@ namespace panim::detail {
 
     } // namespace
 
-    bool webgpu_backend_available(std::string &device_name, std::string &api_name, bool &hardware_accelerated, std::string &error) {
+    bool webgpu_backend_available(std::string &device_name, std::string &api_name, std::string &error) {
         if (!initialize_webgpu()) {
             error = webgpu_state().error;
             return false;
         }
+        if (!webgpu_state().hardware_accelerated) {
+            error = "WebGPU selected a CPU adapter; a hardware GPU is required";
+            return false;
+        }
         device_name = webgpu_state().device_name;
         api_name = webgpu_state().api_name;
-        hardware_accelerated = webgpu_state().hardware_accelerated;
         return true;
     }
 

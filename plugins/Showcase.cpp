@@ -103,7 +103,7 @@ namespace {
 
                 caption_.set_center_norm(0.5, 0.14);
                 caption_.set_target_height_ratio(0.05);
-                caption_.add_keyframe("\\text{Hardware accel when available}", 1.4, 0.6, 1.0);
+                caption_.add_keyframe("\\text{WebGPU hardware acceleration}", 1.4, 0.6, 1.0);
                 caption_.add_keyframe("\\text{Timeline-driven blobs}", 1.4, 0.6, 0.82);
                 caption_.add_keyframe("\\text{LaTeX overlays (optional)}", 1.4, 0.6, 1.08);
                 caption_.add_keyframe("\\text{Replace me with your scene}", 1.4, 0.6, 0.92);
@@ -205,7 +205,7 @@ namespace {
             panim::ComputeParams params;
             auto result = panim::apply_compute_effect(temp, panim::ComputeEffect::Invert, params);
             if (result.ok && !compute_logged_) {
-                PANIM_LOG_INFO("Showcase: {} invert active on badge overlay", panim::compute_backend_name(result.backend));
+                PANIM_LOG_INFO("Showcase: WebGPU invert active on badge overlay");
                 compute_logged_ = true;
             }
             Painter p(frame);

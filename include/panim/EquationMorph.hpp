@@ -19,18 +19,12 @@ namespace panim {
 
     struct EquationMorph {
         // Provide LaTeX strings to morph between. scale is applied at rasterization.
-        Status init(const std::string &from_latex,
-                    const std::string &to_latex,
-                    LatexRenderer &renderer,
-                    double scale = 1.0,
+        Status init(const std::string &from_latex, const std::string &to_latex, LatexRenderer &renderer, double scale = 1.0,
                     int target_height_px = -1);
 
         // Use independent endpoint heights when the animation intentionally
         // changes text size. A negative height leaves that endpoint at scale.
-        Status init(const std::string &from_latex,
-                    const std::string &to_latex,
-                    LatexRenderer &renderer,
-                    const EquationMorphSizing &sizing);
+        Status init(const std::string &from_latex, const std::string &to_latex, LatexRenderer &renderer, const EquationMorphSizing &sizing);
 
         // Set desired center position where the morph should be placed when rendering.
         void set_center(int cx, int cy) {

@@ -34,16 +34,6 @@ namespace {
         return "\\text{" + text + "}";
     }
 
-    panim::Color backend_color(panim::ComputeBackend backend) {
-        switch (backend) {
-        case panim::ComputeBackend::WebGpu:
-            return {100, 220, 255, 255};
-        case panim::ComputeBackend::Cpu:
-            return {255, 202, 96, 255};
-        }
-        return {255, 255, 255, 255};
-    }
-
     class HardwareDemo : public panim::Animation {
     public:
         panim::AnimationInfo info() const override { return {"HardwareDemo", 4.0, 1280, 720, 30.0}; }
@@ -51,7 +41,6 @@ namespace {
         void on_setup(const panim::AnimationContext &ctx) override {
             ctx_ = ctx;
             device_ = panim::compute_device();
-            accent_ = backend_color(device_.backend);
             PANIM_LOG_INFO("HardwareDemo selected {} on {}", device_.backend_name, device_.device_name);
 
             if (ctx.latex) {
@@ -61,11 +50,11 @@ namespace {
 
                 backend_.set_center_norm(0.5, 0.19);
                 backend_.set_target_height_ratio(0.038);
-                backend_.add_keyframe(latex_text("Auto-selected: " + device_.device_name + " via " + device_.backend_name), 60.0, 0.0);
+                backend_.add_keyframe(latex_text(device_.device_name + " via " + device_.backend_name), 60.0, 0.0);
 
                 footer_.set_center_norm(0.5, 0.91);
                 footer_.set_target_height_ratio(0.033);
-                footer_.add_keyframe("\\text{One WGSL kernel / WebGPU / CPU}", 60.0, 0.0);
+                footer_.add_keyframe("\\text{One WGSL kernel / WebGPU}", 60.0, 0.0);
 
                 title_ready_ = title_.prepare(*ctx.latex, ctx.height).ok;
                 backend_ready_ = backend_.prepare(*ctx.latex, ctx.height).ok;
@@ -80,7 +69,7 @@ namespace {
             panim::ComputeResult result = panim::apply_compute_effect(frame, panim::ComputeEffect::AnimatedGradient, params);
             if (!result_logged_) {
                 if (result.ok) {
-                    PANIM_LOG_INFO("HardwareDemo frames executing on {}", panim::compute_backend_name(result.backend));
+                    PANIM_LOG_INFO("HardwareDemo frames executing on WebGPU");
                 } else {
                     PANIM_LOG_ERROR("HardwareDemo compute failed: {}", result.message);
                 }

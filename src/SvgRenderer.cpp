@@ -1,12 +1,14 @@
 #include "panim/SvgRenderer.hpp"
 #include "panim/Log.hpp"
 
-#ifdef PANIM_ENABLE_SVG
-
 #include <algorithm>
+#include <bit>
 #include <cairo/cairo.h>
 #include <cmath>
+#include <cstdint>
 #include <librsvg/rsvg.h>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace panim {
@@ -29,6 +31,115 @@ namespace panim {
                     g_object_unref(handle);
             }
         };
+
+        struct RasterCache {
+            static constexpr size_t max_bytes = 256 * 1024 * 1024;
+            static constexpr size_t max_entries = 2048;
+
+            struct Entry {
+                Frame frame{0, 0};
+                int offset_x = 0;
+                int offset_y = 0;
+            };
+
+            std::unordered_map<std::string, Entry> frames;
+            size_t bytes = 0;
+        };
+
+        RasterCache &raster_cache() {
+            static RasterCache cache;
+            return cache;
+        }
+
+        std::string scale_key(double scale) {
+            return std::to_string(std::bit_cast<uint64_t>(scale));
+        }
+
+        std::string file_cache_key(const std::filesystem::path &path, double scale) {
+            std::error_code error;
+            auto modified = std::filesystem::last_write_time(path, error);
+            auto timestamp = error ? 0 : modified.time_since_epoch().count();
+            return "file:" + path.lexically_normal().string() + ':' +
+                   std::to_string(timestamp) + ':' + scale_key(scale);
+        }
+
+        std::string data_cache_key(std::string_view data, double scale) {
+            std::string key;
+            key.reserve(data.size() + 32);
+            key.append("data:");
+            key.append(data);
+            key.push_back(':');
+            key.append(scale_key(scale));
+            return key;
+        }
+
+        bool load_cached_frame(const std::string &key,
+                               Frame &out,
+                               int *offset_x = nullptr,
+                               int *offset_y = nullptr) {
+            const auto &frames = raster_cache().frames;
+            auto cached = frames.find(key);
+            if (cached == frames.end())
+                return false;
+            out = cached->second.frame;
+            if (offset_x)
+                *offset_x = cached->second.offset_x;
+            if (offset_y)
+                *offset_y = cached->second.offset_y;
+            return true;
+        }
+
+        void cache_frame(std::string key,
+                         const Frame &frame,
+                         int offset_x = 0,
+                         int offset_y = 0) {
+            size_t frame_bytes = frame.pixels.size();
+            if (frame_bytes > RasterCache::max_bytes)
+                return;
+
+            RasterCache &cache = raster_cache();
+            if (cache.bytes + frame_bytes > RasterCache::max_bytes ||
+                cache.frames.size() >= RasterCache::max_entries) {
+                cache.frames.clear();
+                cache.bytes = 0;
+            }
+            RasterCache::Entry value{frame, offset_x, offset_y};
+            auto [entry, inserted] = cache.frames.emplace(std::move(key), std::move(value));
+            if (inserted)
+                cache.bytes += frame_bytes;
+        }
+
+        bool crop_to_alpha(Frame &frame, int &offset_x, int &offset_y) {
+            int min_x = frame.width;
+            int min_y = frame.height;
+            int max_x = -1;
+            int max_y = -1;
+            for (int y = 0; y < frame.height; ++y) {
+                for (int x = 0; x < frame.width; ++x) {
+                    if (frame.pixel_ptr(x, y)[3] == 0)
+                        continue;
+                    min_x = std::min(min_x, x);
+                    min_y = std::min(min_y, y);
+                    max_x = std::max(max_x, x);
+                    max_y = std::max(max_y, y);
+                }
+            }
+            if (max_x < min_x || max_y < min_y)
+                return false;
+
+            offset_x = min_x;
+            offset_y = min_y;
+            Frame cropped(max_x - min_x + 1, max_y - min_y + 1);
+            for (int y = 0; y < cropped.height; ++y) {
+                for (int x = 0; x < cropped.width; ++x) {
+                    const uint8_t *source = frame.pixel_ptr(min_x + x, min_y + y);
+                    uint8_t *target = cropped.pixel_ptr(x, y);
+                    std::copy_n(source, 4, target);
+                }
+            }
+            frame = std::move(cropped);
+            return true;
+        }
 
         bool load_dimensions(SvgImage &img, const std::string &label) {
             gdouble w = 0.0;
@@ -207,19 +318,47 @@ namespace panim {
     bool rasterize_svg(const std::filesystem::path &svg_path, Frame &out, double scale) {
         if (!std::filesystem::exists(svg_path))
             return false;
+        std::string cache_key = file_cache_key(svg_path, scale);
+        if (load_cached_frame(cache_key, out))
+            return true;
         SvgImage img = load_svg(svg_path);
         if (!img.handle)
             return false;
-        return rasterize_image(img, out, scale);
+        if (!rasterize_image(img, out, scale))
+            return false;
+        cache_frame(std::move(cache_key), out);
+        return true;
     }
 
     bool rasterize_svg_data(std::string_view svg_data, Frame &out, double scale) {
+        std::string cache_key = data_cache_key(svg_data, scale);
+        if (load_cached_frame(cache_key, out))
+            return true;
         SvgImage img = load_svg_data(svg_data);
         if (!img.handle)
             return false;
-        return rasterize_image(img, out, scale);
+        if (!rasterize_image(img, out, scale))
+            return false;
+        cache_frame(std::move(cache_key), out);
+        return true;
+    }
+
+    bool rasterize_svg_data_cropped(std::string_view svg_data,
+                                    Frame &out,
+                                    int &offset_x,
+                                    int &offset_y,
+                                    double scale) {
+        std::string cache_key = "cropped:" + data_cache_key(svg_data, scale);
+        if (load_cached_frame(cache_key, out, &offset_x, &offset_y))
+            return true;
+
+        SvgImage img = load_svg_data(svg_data);
+        if (!img.handle || !rasterize_image(img, out, scale) ||
+            !crop_to_alpha(out, offset_x, offset_y)) {
+            return false;
+        }
+        cache_frame(std::move(cache_key), out, offset_x, offset_y);
+        return true;
     }
 
 } // namespace panim
-
-#endif // PANIM_ENABLE_SVG

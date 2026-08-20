@@ -4,7 +4,7 @@
 namespace panim::detail {
 
     inline constexpr char compute_shader_wgsl[] = R"PANIM_WGSL(
-@PANIM_COMPUTE_WGSL@
+@COMPUTE_SHADER@
 )PANIM_WGSL";
 
 } // namespace panim::detail
