@@ -1,10 +1,14 @@
-// Generated from shaders/Compute.wgsl by CMake.
+// Generated from the WGSL sources by CMake.
 #pragma once
 
 namespace panim::detail {
 
     inline constexpr char compute_shader_wgsl[] = R"PANIM_WGSL(
 @COMPUTE_SHADER@
+)PANIM_WGSL";
+
+    inline constexpr char preview_shader_wgsl[] = R"PANIM_WGSL(
+@PREVIEW_SHADER@
 )PANIM_WGSL";
 
 } // namespace panim::detail

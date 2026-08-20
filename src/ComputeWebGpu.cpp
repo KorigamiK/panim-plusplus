@@ -1,5 +1,5 @@
 #include "ComputeBackend.hpp"
-#include "ComputeShader.hpp"
+#include "Shaders.hpp"
 
 #include "panim/Log.hpp"
 

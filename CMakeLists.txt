@@ -27,12 +27,14 @@ find_path(WGPU_INCLUDE_DIR webgpu/wgpu.h REQUIRED)
 find_library(WGPU_LIBRARY wgpu_native REQUIRED)
 
 file(READ shaders/Compute.wgsl COMPUTE_SHADER)
+file(READ shaders/Preview.wgsl PREVIEW_SHADER)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     shaders/Compute.wgsl
+    shaders/Preview.wgsl
 )
 configure_file(
-    src/ComputeShader.hpp.in
-    generated/ComputeShader.hpp
+    src/Shaders.hpp.in
+    generated/Shaders.hpp
     @ONLY
 )
 
@@ -88,7 +90,10 @@ add_executable(panim
     src/Preview.cpp
     src/PreviewSurface.cpp
 )
-target_include_directories(panim PRIVATE ${WGPU_INCLUDE_DIR})
+target_include_directories(panim PRIVATE
+    ${WGPU_INCLUDE_DIR}
+    ${CMAKE_CURRENT_BINARY_DIR}/generated
+)
 target_link_libraries(panim PRIVATE panim_core SDL3::SDL3 ${CMAKE_DL_LIBS})
 if(APPLE)
     target_link_libraries(panim PRIVATE "-framework Cocoa")
