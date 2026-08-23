@@ -3,6 +3,7 @@
 #include "Shaders.hpp"
 
 #include <SDL3/SDL.h>
+#include <cairo/cairo.h>
 #include <webgpu/webgpu.h>
 #include <webgpu/wgpu.h>
 
@@ -17,6 +18,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "panim/Animation.hpp"
 #include "panim/FrameSink.hpp"
@@ -40,15 +42,6 @@ namespace panim {
             WGPURequestDeviceStatus status = WGPURequestDeviceStatus_Error;
             std::string message;
         };
-
-        struct PreviewParams {
-            float progress = 0.0f;
-            float playing = 1.0f;
-            float hovered_control = 0.0f;
-            float padding = 0.0f;
-        };
-
-        static_assert(sizeof(PreviewParams) == 16);
 
         std::string string_from_view(WGPUStringView view) {
             if (!view.data)
@@ -126,12 +119,248 @@ namespace panim {
             return "unknown";
         }
 
+        constexpr double osc_virtual_height = 720.0;
+        constexpr double osc_bar_height = 54.0;
+        constexpr double osc_min_width = 854.0;
+        constexpr double osc_line_1 = 12.0;
+        constexpr double osc_line_2 = 39.0;
+        constexpr double osc_button_width = 27.0;
+        constexpr double osc_padding = 9.0;
+        constexpr double osc_time_width = 110.0;
+
+        double osc_scale(int width, int height) {
+            double scale = static_cast<double>(height) / osc_virtual_height;
+            if (static_cast<double>(width) / scale < osc_min_width)
+                scale = static_cast<double>(width) / osc_min_width;
+            return scale;
+        }
+
+        double osc_width(int width, int height) {
+            return static_cast<double>(width) / osc_scale(width, height);
+        }
+
+        std::pair<double, double> osc_seek_bounds(double virtual_width) {
+            double play_x = -2.0 + osc_padding + osc_button_width * 0.5;
+            double next_x = play_x + (osc_button_width + osc_padding) * 2.0;
+            double left_time_right = next_x + osc_button_width * 0.5 +
+                                     osc_padding + osc_time_width;
+            double right_time_right = virtual_width - osc_padding;
+            return {
+                left_time_right + osc_padding,
+                right_time_right - osc_time_width - osc_padding,
+            };
+        }
+
+        std::string format_osc_time(double seconds, bool negative) {
+            auto total = static_cast<long long>(std::floor(std::max(seconds, 0.0)));
+            long long hours = total / 3600;
+            long long minutes = (total / 60) % 60;
+            long long remaining_seconds = total % 60;
+            char text[32]{};
+            std::snprintf(text,
+                          sizeof(text),
+                          negative ? "-%02lld:%02lld:%02lld" : "%02lld:%02lld:%02lld",
+                          hours,
+                          minutes,
+                          remaining_seconds);
+            return text;
+        }
+
+        enum class TextAlignment {
+            Left,
+            Right,
+        };
+
+        void draw_osc_text(cairo_t *cr,
+                           const std::string &text,
+                           double x,
+                           double center_y,
+                           TextAlignment alignment) {
+            cairo_text_extents_t extents{};
+            cairo_text_extents(cr, text.c_str(), &extents);
+            double text_x = x - extents.x_bearing;
+            if (alignment == TextAlignment::Right)
+                text_x -= extents.width;
+            double text_y = center_y - extents.y_bearing - extents.height * 0.5;
+            cairo_move_to(cr, text_x, text_y);
+            cairo_show_text(cr, text.c_str());
+        }
+
+        void draw_play_pause(cairo_t *cr, double center_x, double center_y, bool playing) {
+            if (playing) {
+                cairo_rectangle(cr, center_x - 5.5, center_y - 8.0, 4.0, 16.0);
+                cairo_rectangle(cr, center_x + 1.5, center_y - 8.0, 4.0, 16.0);
+                cairo_fill(cr);
+                return;
+            }
+            cairo_move_to(cr, center_x - 5.0, center_y - 9.0);
+            cairo_line_to(cr, center_x + 7.0, center_y);
+            cairo_line_to(cr, center_x - 5.0, center_y + 9.0);
+            cairo_close_path(cr);
+            cairo_fill(cr);
+        }
+
+        void draw_chapter_button(cairo_t *cr,
+                                 double center_x,
+                                 double center_y,
+                                 bool forward) {
+            double direction = forward ? 1.0 : -1.0;
+            cairo_move_to(cr, center_x - 6.0 * direction, center_y - 8.0);
+            cairo_line_to(cr, center_x + 4.0 * direction, center_y);
+            cairo_line_to(cr, center_x - 6.0 * direction, center_y + 8.0);
+            cairo_close_path(cr);
+            cairo_fill(cr);
+            cairo_rectangle(cr,
+                            center_x + 5.0 * direction - (forward ? 1.5 : 0.0),
+                            center_y - 8.0,
+                            1.5,
+                            16.0);
+            cairo_fill(cr);
+        }
+
+        void blend_osc(std::vector<uint8_t> &destination,
+                       int width,
+                       int start_y,
+                       const std::vector<uint8_t> &overlay,
+                       int overlay_height) {
+            for (int y = 0; y < overlay_height; ++y) {
+                for (int x = 0; x < width; ++x) {
+                    size_t source_index =
+                        (static_cast<size_t>(y) * width + static_cast<size_t>(x)) * 4;
+                    uint32_t source_alpha = overlay[source_index + 3];
+                    if (source_alpha == 0)
+                        continue;
+                    size_t destination_index =
+                        (static_cast<size_t>(start_y + y) * width +
+                         static_cast<size_t>(x)) * 4;
+                    uint32_t inverse_alpha = 255 - source_alpha;
+                    destination[destination_index] = static_cast<uint8_t>(
+                        overlay[source_index + 2] +
+                        (destination[destination_index] * inverse_alpha + 127) / 255);
+                    destination[destination_index + 1] = static_cast<uint8_t>(
+                        overlay[source_index + 1] +
+                        (destination[destination_index + 1] * inverse_alpha + 127) / 255);
+                    destination[destination_index + 2] = static_cast<uint8_t>(
+                        overlay[source_index] +
+                        (destination[destination_index + 2] * inverse_alpha + 127) / 255);
+                    destination[destination_index + 3] = static_cast<uint8_t>(
+                        source_alpha +
+                        (destination[destination_index + 3] * inverse_alpha + 127) / 255);
+                }
+            }
+        }
+
+        void render_osc(std::vector<uint8_t> &destination,
+                        std::vector<uint8_t> &overlay,
+                        int width,
+                        int height,
+                        const std::string &title,
+                        double time_seconds,
+                        double duration_seconds,
+                        bool playing,
+                        double opacity) {
+            double scale = osc_scale(width, height);
+            int overlay_height = std::min(
+                height, std::max(1, static_cast<int>(std::ceil(osc_bar_height * scale))));
+            int stride = cairo_format_stride_for_width(CAIRO_FORMAT_ARGB32, width);
+            overlay.assign(static_cast<size_t>(stride) * overlay_height, 0);
+            cairo_surface_t *surface = cairo_image_surface_create_for_data(
+                overlay.data(), CAIRO_FORMAT_ARGB32, width, overlay_height, stride);
+            if (cairo_surface_status(surface) != CAIRO_STATUS_SUCCESS) {
+                cairo_surface_destroy(surface);
+                return;
+            }
+            cairo_t *cr = cairo_create(surface);
+            cairo_set_antialias(cr, CAIRO_ANTIALIAS_BEST);
+            cairo_font_options_t *font_options = cairo_font_options_create();
+            cairo_font_options_set_antialias(font_options, CAIRO_ANTIALIAS_GRAY);
+            cairo_font_options_set_hint_style(font_options, CAIRO_HINT_STYLE_SLIGHT);
+            cairo_set_font_options(cr, font_options);
+            cairo_font_options_destroy(font_options);
+            cairo_scale(cr, scale, scale);
+
+            double virtual_width = static_cast<double>(width) / scale;
+            double visible_height = static_cast<double>(overlay_height) / scale;
+            cairo_push_group(cr);
+            cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 175.0 / 255.0);
+            cairo_rectangle(cr, 0.0, 0.0, virtual_width, visible_height);
+            cairo_fill(cr);
+
+            cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
+            cairo_select_font_face(cr,
+                                   "sans-serif",
+                                   CAIRO_FONT_SLANT_NORMAL,
+                                   CAIRO_FONT_WEIGHT_NORMAL);
+            cairo_set_font_size(cr, 18.0);
+            cairo_save(cr);
+            cairo_rectangle(cr,
+                            osc_padding,
+                            0.0,
+                            std::max(0.0, virtual_width - osc_padding * 2.0),
+                            27.0);
+            cairo_clip(cr);
+            draw_osc_text(cr, title, osc_padding, osc_line_1, TextAlignment::Left);
+            cairo_restore(cr);
+
+            double play_x = -2.0 + osc_padding + osc_button_width * 0.5;
+            double previous_x = play_x + osc_button_width + osc_padding;
+            double next_x = previous_x + osc_button_width + osc_padding;
+            draw_play_pause(cr, play_x, osc_line_2, playing);
+            draw_chapter_button(cr, previous_x, osc_line_2, false);
+            draw_chapter_button(cr, next_x, osc_line_2, true);
+
+            auto [seek_left, seek_right] = osc_seek_bounds(virtual_width);
+            double left_time_right = seek_left - osc_padding;
+            double right_time_right = virtual_width - osc_padding;
+            double seek_height = 25.0;
+            double seek_top = osc_line_2 - seek_height * 0.5;
+            if (seek_right > seek_left) {
+                cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, 35.0 / 255.0);
+                cairo_rectangle(cr,
+                                seek_left,
+                                seek_top,
+                                seek_right - seek_left,
+                                seek_height);
+                cairo_fill(cr);
+                double progress = std::clamp(time_seconds / duration_seconds, 0.0, 1.0);
+                cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
+                cairo_rectangle(cr,
+                                seek_left,
+                                seek_top,
+                                (seek_right - seek_left) * progress,
+                                seek_height);
+                cairo_fill(cr);
+            }
+
+            cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
+            cairo_set_font_size(cr, 27.0);
+            draw_osc_text(cr,
+                          format_osc_time(time_seconds, false),
+                          left_time_right,
+                          osc_line_2,
+                          TextAlignment::Right);
+            draw_osc_text(cr,
+                          format_osc_time(duration_seconds - time_seconds, true),
+                          right_time_right,
+                          osc_line_2,
+                          TextAlignment::Right);
+
+            cairo_pop_group_to_source(cr);
+            cairo_paint_with_alpha(cr, std::clamp(opacity, 0.0, 1.0));
+            cairo_surface_flush(surface);
+            cairo_destroy(cr);
+            cairo_surface_destroy(surface);
+            blend_osc(destination,
+                      width,
+                      height - overlay_height,
+                      overlay,
+                      overlay_height);
+        }
+
         class PreviewPresenter {
         public:
             ~PreviewPresenter() {
                 release_frame_texture();
-                if (params_buffer_)
-                    wgpuBufferRelease(params_buffer_);
                 if (sampler_)
                     wgpuSamplerRelease(sampler_);
                 if (bind_group_layout_)
@@ -209,7 +438,12 @@ namespace panim {
                 return configure_surface();
             }
 
-            Status present(const Frame &frame, double progress, bool playing, int hovered_control) {
+            Status present(const Frame &frame,
+                           const std::string &title,
+                           double time_seconds,
+                           double duration_seconds,
+                           bool playing,
+                           double controls_opacity) {
                 Status status = ensure_frame_texture(frame.width, frame.height);
                 if (!status.ok)
                     return status;
@@ -227,13 +461,26 @@ namespace panim {
                     static_cast<uint32_t>(frame.height),
                     1,
                 };
-                wgpuQueueWriteTexture(queue_, &destination, frame.pixels.data(), frame.pixels.size(), &layout, &extent);
-
-                PreviewParams params;
-                params.progress = static_cast<float>(std::clamp(progress, 0.0, 1.0));
-                params.playing = playing ? 1.0f : 0.0f;
-                params.hovered_control = static_cast<float>(hovered_control);
-                wgpuQueueWriteBuffer(queue_, params_buffer_, 0, &params, sizeof(params));
+                const std::vector<uint8_t> *pixels = &frame.pixels;
+                if (controls_opacity > 0.001) {
+                    preview_pixels_ = frame.pixels;
+                    render_osc(preview_pixels_,
+                               overlay_pixels_,
+                               frame.width,
+                               frame.height,
+                               title,
+                               time_seconds,
+                               duration_seconds,
+                               playing,
+                               controls_opacity);
+                    pixels = &preview_pixels_;
+                }
+                wgpuQueueWriteTexture(queue_,
+                                      &destination,
+                                      pixels->data(),
+                                      pixels->size(),
+                                      &layout,
+                                      &extent);
 
                 WGPUSurfaceTexture surface_texture = WGPU_SURFACE_TEXTURE_INIT;
                 wgpuSurfaceGetCurrentTexture(surface_.surface, &surface_texture);
@@ -372,12 +619,7 @@ namespace panim {
                 sampler_descriptor.magFilter = WGPUFilterMode_Linear;
                 sampler_descriptor.minFilter = WGPUFilterMode_Linear;
                 sampler_ = wgpuDeviceCreateSampler(device_, &sampler_descriptor);
-                WGPUBufferDescriptor buffer_descriptor = WGPU_BUFFER_DESCRIPTOR_INIT;
-                buffer_descriptor.label = string_view("panim preview timeline parameters");
-                buffer_descriptor.size = sizeof(PreviewParams);
-                buffer_descriptor.usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst;
-                params_buffer_ = wgpuDeviceCreateBuffer(device_, &buffer_descriptor);
-                if (!bind_group_layout_ || !sampler_ || !params_buffer_)
+                if (!bind_group_layout_ || !sampler_)
                     return Status::failure("Failed to create preview pipeline resources");
                 return Status::success();
             }
@@ -428,18 +670,16 @@ namespace panim {
                 if (frame_texture_)
                     frame_view_ = wgpuTextureCreateView(frame_texture_, nullptr);
 
-                WGPUBindGroupEntry entries[3]{WGPU_BIND_GROUP_ENTRY_INIT, WGPU_BIND_GROUP_ENTRY_INIT, WGPU_BIND_GROUP_ENTRY_INIT};
+                WGPUBindGroupEntry entries[2]{WGPU_BIND_GROUP_ENTRY_INIT,
+                                              WGPU_BIND_GROUP_ENTRY_INIT};
                 entries[0].binding = 0;
                 entries[0].textureView = frame_view_;
                 entries[1].binding = 1;
                 entries[1].sampler = sampler_;
-                entries[2].binding = 2;
-                entries[2].buffer = params_buffer_;
-                entries[2].size = sizeof(PreviewParams);
                 WGPUBindGroupDescriptor bind_descriptor = WGPU_BIND_GROUP_DESCRIPTOR_INIT;
                 bind_descriptor.label = string_view("panim preview frame resources");
                 bind_descriptor.layout = bind_group_layout_;
-                bind_descriptor.entryCount = 3;
+                bind_descriptor.entryCount = 2;
                 bind_descriptor.entries = entries;
                 if (frame_view_) {
                     bind_group_ = wgpuDeviceCreateBindGroup(device_, &bind_descriptor);
@@ -477,7 +717,6 @@ namespace panim {
             WGPURenderPipeline pipeline_ = nullptr;
             WGPUBindGroupLayout bind_group_layout_ = nullptr;
             WGPUSampler sampler_ = nullptr;
-            WGPUBuffer params_buffer_ = nullptr;
             WGPUTexture frame_texture_ = nullptr;
             WGPUTextureView frame_view_ = nullptr;
             WGPUBindGroup bind_group_ = nullptr;
@@ -487,6 +726,8 @@ namespace panim {
             int configured_height_ = 0;
             int frame_width_ = 0;
             int frame_height_ = 0;
+            std::vector<uint8_t> preview_pixels_;
+            std::vector<uint8_t> overlay_pixels_;
         };
 
         using AnimationPtr = std::unique_ptr<Animation, std::function<void(Animation *)>>;
@@ -614,13 +855,10 @@ namespace panim {
 
         enum class PreviewControl {
             None = 0,
-            Restart = 1,
+            PlayPause = 1,
             StepBack = 2,
-            PlayPause = 3,
-            StepForward = 4,
-            Screenshot = 5,
-            Reload = 6,
-            Timeline = 7,
+            StepForward = 3,
+            Timeline = 4,
         };
 
         struct PreviewPoint {
@@ -649,47 +887,41 @@ namespace panim {
             return point;
         }
 
-        PreviewControl control_at(const PreviewPoint &point) {
-            if (!point.inside || point.y < 0.86)
+        PreviewControl control_at(const PreviewPoint &point,
+                                  int frame_width,
+                                  int frame_height) {
+            if (!point.inside)
                 return PreviewControl::None;
 
-            constexpr double centers[] = {
-                0.050, 0.115, 0.185, 0.255, 0.855, 0.925,
+            double scale = osc_scale(frame_width, frame_height);
+            double virtual_x = point.x * frame_width / scale;
+            double from_bottom = (1.0 - point.y) * frame_height / scale;
+            if (from_bottom > osc_bar_height)
+                return PreviewControl::None;
+
+            double play_x = -2.0 + osc_padding + osc_button_width * 0.5;
+            double centers[] = {
+                play_x,
+                play_x + osc_button_width + osc_padding,
+                play_x + (osc_button_width + osc_padding) * 2.0,
             };
             constexpr PreviewControl controls[] = {
-                PreviewControl::Restart,     PreviewControl::StepBack,   PreviewControl::PlayPause,
-                PreviewControl::StepForward, PreviewControl::Screenshot, PreviewControl::Reload,
+                PreviewControl::PlayPause,
+                PreviewControl::StepBack,
+                PreviewControl::StepForward,
             };
             for (size_t index = 0; index < std::size(centers); ++index) {
-                if (std::abs(point.x - centers[index]) <= 0.030 && std::abs(point.y - 0.93) <= 0.060) {
+                if (std::abs(virtual_x - centers[index]) <= osc_button_width * 0.5 &&
+                    std::abs(from_bottom - (osc_bar_height - osc_line_2)) <= 14.5) {
                     return controls[index];
                 }
             }
-            if (point.x >= 0.29 && point.x <= 0.81)
+            auto [seek_left, seek_right] = osc_seek_bounds(osc_width(frame_width, frame_height));
+            if (virtual_x >= seek_left && virtual_x <= seek_right &&
+                std::abs(from_bottom - (osc_bar_height - osc_line_2)) <= 14.5) {
                 return PreviewControl::Timeline;
-            return PreviewControl::None;
-        }
-
-        const char *control_label(PreviewControl control) {
-            switch (control) {
-            case PreviewControl::Restart:
-                return "Restart";
-            case PreviewControl::StepBack:
-                return "Previous frame";
-            case PreviewControl::PlayPause:
-                return "Play / pause";
-            case PreviewControl::StepForward:
-                return "Next frame";
-            case PreviewControl::Screenshot:
-                return "Save PNG";
-            case PreviewControl::Reload:
-                return "Reload plugin";
-            case PreviewControl::Timeline:
-                return "Scrub timeline";
-            case PreviewControl::None:
-                break;
             }
-            return "";
+            return PreviewControl::None;
         }
 
     } // namespace
@@ -751,8 +983,8 @@ namespace panim {
         SDL_Cursor *pointer_cursor = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_POINTER);
 
         PANIM_LOG_INFO("Interactive preview: {}x{} @ {} fps", source_width, source_height, loaded->fps);
-        PANIM_LOG_INFO("Controls: clickable transport, Space play/pause, Left/Right step, "
-                       "Shift step 1s, S screenshot, R reload, Esc quit");
+        PANIM_LOG_INFO("Controls: mpv-style bottom bar, Space play/pause, "
+                       "Left/Right step, Shift step 1s, S screenshot, R reload, Esc quit");
         if (options.watch_plugin) {
             PANIM_LOG_INFO("Watching plugin: {}", options.plugin_path.string());
         }
@@ -770,15 +1002,21 @@ namespace panim {
         auto previous_watch = previous_tick;
         auto pending_since = previous_tick;
         auto next_frame = previous_tick;
+        constexpr auto controls_hold = std::chrono::milliseconds(500);
+        constexpr auto controls_fade = std::chrono::milliseconds(200);
+        auto last_pointer_activity = previous_tick - controls_hold - controls_fade;
         bool reload_pending = false;
         bool force_reload = false;
         bool running = true;
         bool playing = true;
         bool dirty = true;
         bool scrubbing = false;
+        bool mouse_inside = true;
+        bool cursor_visible = SDL_CursorVisible();
         PreviewControl hovered_control = PreviewControl::None;
         Status loop_status = Status::success();
         double time_seconds = std::clamp(options.start_time, 0.0, loaded->duration);
+        double controls_opacity = 0.0;
         int presented_frames = 0;
 
         auto point_from_mouse = [&](float mouse_x, float mouse_y) { return preview_point(window, source_width, source_height, mouse_x, mouse_y); };
@@ -786,7 +1024,12 @@ namespace panim {
             PreviewPoint point = point_from_mouse(mouse_x, mouse_y);
             if (!point.inside)
                 return;
-            double ratio = std::clamp((point.x - 0.30) / (0.80 - 0.30), 0.0, 1.0);
+            double scale = osc_scale(source_width, source_height);
+            double virtual_x = point.x * source_width / scale;
+            auto [seek_left, seek_right] =
+                osc_seek_bounds(osc_width(source_width, source_height));
+            double ratio = std::clamp(
+                (virtual_x - seek_left) / (seek_right - seek_left), 0.0, 1.0);
             time_seconds = ratio * loaded->duration;
             playing = false;
             dirty = true;
@@ -798,6 +1041,14 @@ namespace panim {
             }
             if (!screenshot_status.ok) {
                 PANIM_LOG_ERROR("Screenshot failed: {}", screenshot_status.message);
+            }
+            dirty = true;
+        };
+        auto note_pointer_activity = [&]() {
+            last_pointer_activity = Clock::now();
+            if (!cursor_visible) {
+                SDL_ShowCursor();
+                cursor_visible = true;
             }
             dirty = true;
         };
@@ -862,12 +1113,15 @@ namespace panim {
                         break;
                     }
                 } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT) {
-                    PreviewControl control = control_at(point_from_mouse(event.button.x, event.button.y));
+                    note_pointer_activity();
+                    PreviewControl control = control_at(
+                        point_from_mouse(event.button.x, event.button.y),
+                        source_width,
+                        source_height);
                     set_hovered_control(control);
                     switch (control) {
-                    case PreviewControl::Restart:
-                        time_seconds = 0.0;
-                        playing = false;
+                    case PreviewControl::PlayPause:
+                        playing = !playing;
                         dirty = true;
                         break;
                     case PreviewControl::StepBack:
@@ -875,20 +1129,11 @@ namespace panim {
                         playing = false;
                         dirty = true;
                         break;
-                    case PreviewControl::PlayPause:
-                        playing = !playing;
-                        dirty = true;
-                        break;
                     case PreviewControl::StepForward:
-                        time_seconds = std::min(loaded->duration, time_seconds + 1.0 / loaded->fps);
+                        time_seconds = std::min(loaded->duration,
+                                                time_seconds + 1.0 / loaded->fps);
                         playing = false;
                         dirty = true;
-                        break;
-                    case PreviewControl::Screenshot:
-                        capture_screenshot();
-                        break;
-                    case PreviewControl::Reload:
-                        force_reload = true;
                         break;
                     case PreviewControl::Timeline:
                         scrubbing = true;
@@ -898,12 +1143,25 @@ namespace panim {
                         break;
                     }
                 } else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP && event.button.button == SDL_BUTTON_LEFT) {
+                    note_pointer_activity();
                     scrubbing = false;
                 } else if (event.type == SDL_EVENT_MOUSE_MOTION) {
-                    set_hovered_control(control_at(point_from_mouse(event.motion.x, event.motion.y)));
+                    mouse_inside = true;
+                    note_pointer_activity();
+                    set_hovered_control(control_at(
+                        point_from_mouse(event.motion.x, event.motion.y),
+                        source_width,
+                        source_height));
                     if (scrubbing)
                         seek_from_mouse(event.motion.x, event.motion.y);
+                } else if (event.type == SDL_EVENT_WINDOW_MOUSE_ENTER) {
+                    mouse_inside = true;
                 } else if (event.type == SDL_EVENT_WINDOW_MOUSE_LEAVE) {
+                    mouse_inside = false;
+                    if (!cursor_visible) {
+                        SDL_ShowCursor();
+                        cursor_visible = true;
+                    }
                     set_hovered_control(PreviewControl::None);
                 }
             }
@@ -917,6 +1175,30 @@ namespace panim {
                     time_seconds = std::fmod(time_seconds, loaded->duration);
                 }
                 dirty = true;
+            }
+
+            double next_controls_opacity = 1.0;
+            if (!scrubbing && now - last_pointer_activity > controls_hold) {
+                auto fade_elapsed = now - last_pointer_activity - controls_hold;
+                next_controls_opacity = 1.0 -
+                    std::chrono::duration<double>(fade_elapsed).count() /
+                        std::chrono::duration<double>(controls_fade).count();
+                next_controls_opacity = std::clamp(next_controls_opacity, 0.0, 1.0);
+            }
+            if (std::abs(next_controls_opacity - controls_opacity) > 0.001) {
+                controls_opacity = next_controls_opacity;
+                dirty = true;
+            }
+            if (controls_opacity <= 0.001 && hovered_control != PreviewControl::None)
+                set_hovered_control(PreviewControl::None);
+
+            const bool should_show_cursor = !mouse_inside || scrubbing || controls_opacity > 0.001;
+            if (should_show_cursor != cursor_visible) {
+                if (should_show_cursor)
+                    SDL_ShowCursor();
+                else
+                    SDL_HideCursor();
+                cursor_visible = should_show_cursor;
             }
 
             if (options.watch_plugin && now - previous_watch >= std::chrono::milliseconds(200)) {
@@ -953,7 +1235,7 @@ namespace panim {
                 }
             }
 
-            const bool frame_due = !playing || now >= next_frame;
+            const bool frame_due = now >= next_frame;
             if (dirty && frame_due) {
                 status = loaded->session->render_at(time_seconds);
                 if (!status.ok) {
@@ -962,7 +1244,12 @@ namespace panim {
                     running = false;
                     continue;
                 }
-                status = presenter->present(loaded->session->frame(), time_seconds / loaded->duration, playing, static_cast<int>(hovered_control));
+                status = presenter->present(loaded->session->frame(),
+                                            loaded->name,
+                                            time_seconds,
+                                            loaded->duration,
+                                            playing,
+                                            controls_opacity);
                 if (!status.ok) {
                     PANIM_LOG_ERROR("Preview presentation failed: {}", status.message);
                     loop_status = status;
@@ -980,6 +1267,7 @@ namespace panim {
         }
 
         presenter.reset();
+        SDL_ShowCursor();
         if (pointer_cursor) {
             SDL_SetCursor(SDL_GetDefaultCursor());
             SDL_DestroyCursor(pointer_cursor);

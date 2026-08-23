@@ -59,9 +59,7 @@ namespace panim {
             int offset_x = 0;
             int offset_y = 0;
             int match_index = -1;
-            int pair_index = -1;
             bool matched = false;
-            bool paired = false;
         };
 
         Frame from_frame{0, 0};

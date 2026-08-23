@@ -103,9 +103,11 @@ The normal authoring loop has three explicit commands:
 `preview` renders the plugin's native canvas directly into a high-DPI WebGPU
 surface. It uploads the completed RGBA frame to one presentation texture,
 preserves aspect ratio, and does not round-trip through H.264 or a temporary
-video. Its visible transport bar provides restart, previous-frame, play/pause,
-next-frame, timeline, PNG-capture, and plugin-reload controls. The matching
-keyboard shortcuts are:
+video. Preview opens content-only. Pointer movement reveals an mpv-style OSC:
+a full-width bottom bar with the animation title, play and step controls,
+current and remaining time, and a wide seek bar. The bar follows mpv's default
+500 ms idle timeout and 200 ms fade; preview-only actions stay on the keyboard
+instead of adding more buttons. Matching shortcuts are:
 
 - Space plays or pauses;
 - Left/Right steps one frame, and Shift+Left/Right steps one second;
