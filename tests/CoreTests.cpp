@@ -7,6 +7,7 @@
 #include "panim/Painter.hpp"
 #include "panim/RenderSession.hpp"
 #include "panim/SceneSequence.hpp"
+#include "panim/SvgRenderer.hpp"
 #include "panim/Timeline.hpp"
 
 namespace {
@@ -48,6 +49,20 @@ namespace {
         painter.blit_scaled(source, 0, 0, 2, 2);
         pixel = frame.pixel_ptr(1, 1);
         check(pixel[0] == 200 && pixel[1] == 100 && pixel[2] == 50, "scaled blit covers its destination");
+    }
+
+    void test_svg_alpha() {
+        constexpr std::string_view svg =
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"4\" height=\"4\" "
+            "viewBox=\"0 0 4 4\"><rect width=\"4\" height=\"4\" fill=\"white\" "
+            "fill-opacity=\"0.5\"/></svg>";
+        panim::Frame frame(1, 1);
+        check(panim::rasterize_svg_data(svg, frame), "SVG data rasterizes");
+        const uint8_t *pixel = frame.pixel_ptr(2, 2);
+        check(pixel[0] >= 250 && pixel[1] >= 250 && pixel[2] >= 250,
+              "transparent SVG pixels preserve straight RGB color");
+        check(pixel[3] >= 126 && pixel[3] <= 129,
+              "transparent SVG pixels preserve fractional alpha");
     }
 
     void test_scene_sequence() {
@@ -133,6 +148,7 @@ namespace {
 int main() {
     test_timeline();
     test_frame_and_painter();
+    test_svg_alpha();
     test_scene_sequence();
     test_render_session();
     if (failures == 0)

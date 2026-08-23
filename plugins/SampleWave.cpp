@@ -2,13 +2,10 @@
 #include <cmath>
 
 #include "panim/Animation.hpp"
-#include "panim/Compute.hpp"
 #include "panim/EquationMorph.hpp"
 #include "panim/Frame.hpp"
 #include "panim/LatexRenderer.hpp"
-#include "panim/Log.hpp"
 #include "panim/Plugin.hpp"
-#include "panim/SvgRenderer.hpp"
 
 using namespace panim;
 
@@ -34,14 +31,19 @@ namespace {
 
     class SampleWave : public Animation {
     public:
-        AnimationInfo info() const override { return {"SampleWave", 6.0, 1280, 720, 30.0}; }
+        AnimationInfo info() const override { return {"SampleWave", 6.0, 1280, 720, 60.0}; }
 
         void on_setup(const AnimationContext &ctx) override {
             ctx_ = ctx;
             if (ctx.latex) {
-                morph_.init("\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}", "\\frac{1}{\\sqrt{\\pi}} e^{-x^2} \\longrightarrow 1",
-                            *ctx.latex, 1.0, static_cast<int>(ctx.height * 0.15));
+                morph_.init("\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}",
+                            "\\frac{1}{\\sqrt{\\pi}} \\int_{-\\infty}^{\\infty} "
+                            "e^{-x^2} dx = 1",
+                            *ctx.latex,
+                            1.0,
+                            static_cast<int>(ctx.height * 0.18));
                 morph_.set_center_norm(0.5, 0.6); // near center
+                morph_.set_tint(245, 247, 255);
             }
         }
 
@@ -60,34 +62,14 @@ namespace {
                 }
             }
 
-            // Draw a small marker that marches across the screen.
-            int marker_x = static_cast<int>(std::fmod(t * ctx_.width * 0.5, ctx_.width - 50));
-            for (int dy = 0; dy < 32; ++dy) {
-                for (int dx = 0; dx < 50; ++dx) {
-                    frame.set_pixel(marker_x + dx, 30 + dy, 18, 18, 18, 255);
-                }
-            }
-
             if (morph_.ready()) {
                 morph_.render(frame, equation_phase(t));
-            }
-
-            ComputeParams params;
-            auto result = apply_compute_effect(frame, ComputeEffect::Invert, params);
-            if (!compute_reported_) {
-                if (result.ok) {
-                    PANIM_LOG_INFO("WebGPU invert applied");
-                } else {
-                    PANIM_LOG_WARN("Compute invert unavailable: {}", result.message);
-                }
-                compute_reported_ = true;
             }
         }
 
     private:
         AnimationContext ctx_;
         EquationMorph morph_;
-        bool compute_reported_ = false;
     };
 
 } // namespace

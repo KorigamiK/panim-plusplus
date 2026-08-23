@@ -58,7 +58,8 @@ namespace panim {
         std::string file_cache_key(const std::filesystem::path &path, double scale) {
             std::error_code error;
             auto modified = std::filesystem::last_write_time(path, error);
-            auto timestamp = error ? 0 : modified.time_since_epoch().count();
+            const std::int64_t timestamp =
+                error ? 0 : static_cast<std::int64_t>(modified.time_since_epoch().count());
             return "file:" + path.lexically_normal().string() + ':' +
                    std::to_string(timestamp) + ':' + scale_key(scale);
         }
@@ -127,6 +128,11 @@ namespace panim {
             if (max_x < min_x || max_y < min_y)
                 return false;
 
+            constexpr int crop_padding = 2;
+            min_x = std::max(0, min_x - crop_padding);
+            min_y = std::max(0, min_y - crop_padding);
+            max_x = std::min(frame.width - 1, max_x + crop_padding);
+            max_y = std::min(frame.height - 1, max_y + crop_padding);
             offset_x = min_x;
             offset_y = min_y;
             Frame cropped(max_x - min_x + 1, max_y - min_y + 1);
@@ -210,14 +216,23 @@ namespace panim {
                     uint8_t dr = dp[0];
                     uint8_t dg = dp[1];
                     uint8_t db = dp[2];
+                    uint8_t da = dp[3];
 
-                    float a = sa / 255.0f;
-                    if (a < 1e-4f)
+                    float source_alpha = sa / 255.0f;
+                    if (source_alpha < 1e-4f)
                         continue;
-                    dp[0] = static_cast<uint8_t>(sr * a + dr * (1.0f - a));
-                    dp[1] = static_cast<uint8_t>(sg * a + dg * (1.0f - a));
-                    dp[2] = static_cast<uint8_t>(sb * a + db * (1.0f - a));
-                    dp[3] = 255;
+                    float destination_alpha = da / 255.0f;
+                    float output_alpha =
+                        source_alpha + destination_alpha * (1.0f - source_alpha);
+                    float destination_weight =
+                        destination_alpha * (1.0f - source_alpha);
+                    dp[0] = static_cast<uint8_t>(std::lround(
+                        (sr * source_alpha + dr * destination_weight) / output_alpha));
+                    dp[1] = static_cast<uint8_t>(std::lround(
+                        (sg * source_alpha + dg * destination_weight) / output_alpha));
+                    dp[2] = static_cast<uint8_t>(std::lround(
+                        (sb * source_alpha + db * destination_weight) / output_alpha));
+                    dp[3] = static_cast<uint8_t>(std::lround(output_alpha * 255.0f));
                 }
             }
         }
