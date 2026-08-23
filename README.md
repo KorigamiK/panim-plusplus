@@ -110,12 +110,14 @@ current and remaining time, and a wide seek bar. The bar follows mpv's default
 instead of adding more buttons. Matching shortcuts are:
 
 - Space plays or pauses;
+- Comma/Period steps one frame backward or forward;
 - Left/Right steps one frame, and Shift+Left/Right steps one second;
+- F toggles fullscreen;
 - Home/End seek to the timeline boundaries;
 - clicking or dragging the timeline scrubs;
 - S writes a lossless PNG to `panim_out/` (or the `--output` directory);
 - R reloads the plugin immediately; and
-- Escape closes the preview.
+- Q or Escape closes the preview.
 
 Plugin watching is on by default. Rebuild the active target from another
 terminal or your editor, and preview stages and validates the new shared

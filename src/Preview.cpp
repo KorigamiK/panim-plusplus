@@ -984,7 +984,7 @@ namespace panim {
 
         PANIM_LOG_INFO("Interactive preview: {}x{} @ {} fps", source_width, source_height, loaded->fps);
         PANIM_LOG_INFO("Controls: mpv-style bottom bar, Space play/pause, "
-                       "Left/Right step, Shift step 1s, S screenshot, R reload, Esc quit");
+                       ",/. frame step, F fullscreen, Q quit, S screenshot, R reload");
         if (options.watch_plugin) {
             PANIM_LOG_INFO("Watching plugin: {}", options.plugin_path.string());
         }
@@ -1073,6 +1073,7 @@ namespace panim {
                 } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) {
                     switch (event.key.key) {
                     case SDLK_ESCAPE:
+                    case SDLK_Q:
                         running = false;
                         break;
                     case SDLK_SPACE:
@@ -1090,6 +1091,26 @@ namespace panim {
                         double step = (event.key.mod & SDL_KMOD_SHIFT) ? 1.0 : 1.0 / loaded->fps;
                         time_seconds = std::min(loaded->duration, time_seconds + step);
                         playing = false;
+                        dirty = true;
+                        break;
+                    }
+                    case SDLK_COMMA:
+                        time_seconds = std::max(0.0, time_seconds - 1.0 / loaded->fps);
+                        playing = false;
+                        dirty = true;
+                        break;
+                    case SDLK_PERIOD:
+                        time_seconds = std::min(loaded->duration,
+                                                time_seconds + 1.0 / loaded->fps);
+                        playing = false;
+                        dirty = true;
+                        break;
+                    case SDLK_F: {
+                        bool fullscreen =
+                            (SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN) != 0;
+                        if (!SDL_SetWindowFullscreen(window, !fullscreen)) {
+                            PANIM_LOG_ERROR("Could not toggle fullscreen: {}", SDL_GetError());
+                        }
                         dirty = true;
                         break;
                     }

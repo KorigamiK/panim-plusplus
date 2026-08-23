@@ -363,8 +363,8 @@ namespace {
                   << "  panim render FeatureTour --size 3840x2160 --quality master\n\n"
                   << "Preview controls:\n"
                   << "  mpv-style bottom bar with play, step, time, and seek; fades when idle;\n"
-                  << "  Space play/pause, Left/Right step, Shift step 1s,\n"
-                  << "  Home/End seek, S screenshot, R reload, Esc quit\n";
+                  << "  Space play/pause, ,/. frame step, Left/Right step, Shift step 1s,\n"
+                  << "  F fullscreen, Home/End seek, S screenshot, R reload, Q/Esc quit\n";
     }
 
     std::string output_stem(const char *name) {
