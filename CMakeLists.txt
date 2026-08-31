@@ -115,7 +115,7 @@ function(add_panim_plugin name)
     )
 endfunction()
 
-set(plugins SampleWave LatexDemo Showcase HardwareDemo FeatureTour)
+set(plugins SampleWave LatexDemo Showcase HardwareDemo FeatureTour MatrixCal)
 foreach(plugin IN LISTS plugins)
     add_panim_plugin(${plugin})
 endforeach()

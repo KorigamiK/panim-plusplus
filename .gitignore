@@ -44,3 +44,4 @@ build/
 compile_commands.json
 panim_out/
 out/
+latex/
